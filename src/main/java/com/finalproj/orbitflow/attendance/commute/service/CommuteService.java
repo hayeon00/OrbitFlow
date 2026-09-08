@@ -10,6 +10,7 @@ import com.finalproj.orbitflow.attendance.commute.repository.CommuteRepository;
 import com.finalproj.orbitflow.attendance.rule.repository.AttendanceRuleRepository;
 import com.finalproj.orbitflow.attendance.rule.repository.EmployeeRuleRepository;
 import com.finalproj.orbitflow.global.exception.NotFoundException;
+import com.finalproj.orbitflow.global.time.attendance.TimeProvider;
 import com.finalproj.orbitflow.hr.employee.entity.Employee;
 import com.finalproj.orbitflow.hr.employee.enums.WorkStatus;
 import com.finalproj.orbitflow.hr.employee.repository.EmployeeRepository;
@@ -41,10 +42,11 @@ public class CommuteService {
     private final EmployeeRuleRepository employeeRuleRepository;
     private final EmployeeRepository employeeRepository;
     private final AttendanceEventRepository attendanceEventRepository;
+    private final TimeProvider timeProvider;
 
 
     public ActiveRuleResDto getActiveRule(Long companyId, Long employeeId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = timeProvider.today();
 
         return employeeRuleRepository.findActiveRuleByEmployeeIdAndDate(employeeId, today)
                 .map(rule -> new ActiveRuleResDto(rule.getStartTime(), rule.getEndTime(), "EXCEPTION"))
@@ -64,28 +66,22 @@ public class CommuteService {
 
     @Transactional
     public TodayAttResDto checkIn(Long companyId, Long employeeId, AttendanceStatus forcedStatus) {
-        // 이미 출근했는지 검증
-        commuteRepository.findToday(companyId, employeeId)
-                .ifPresent(a -> { throw new BusinessException("이미 출근 처리되었습니다."); });
 
         ActiveRuleResDto rule = getActiveRule(companyId, employeeId);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = timeProvider.nowDateTime();
 
         AttendanceStatus status = (forcedStatus != null)
                 ? forcedStatus
                 : determineAttendanceStatus(now.toLocalTime(), rule.getStartTime());
 
-        Attendance attendance = Attendance.builder()
-                .companyId(companyId)
-                .employeeId(employeeId)
-                .workDate(now.toLocalDate())
-                .commuteAt(now)
-                .isCorrected(false)
-                .status(status)
-                .build();
+        commuteRepository.insertCheckInIgnoreDuplicate(companyId, employeeId, now, status.name());
 
         updateEmployeeWorkStatus(employeeId, WorkStatus.WORKING);
-        return new TodayAttResDto(commuteRepository.save(attendance), false);
+
+        Attendance todayAtt = commuteRepository.findToday(companyId, employeeId)
+                .orElseThrow(() -> new BusinessException("출근 기록을 불러올 수 없습니다."));
+
+        return new TodayAttResDto(todayAtt, false);
     }
 
 
@@ -97,7 +93,9 @@ public class CommuteService {
         ActiveRuleResDto rule = getActiveRule(companyId, employeeId);
         validateCheckOutTime(rule.getEndTime());
 
-        attendance.recordLeave();
+        LocalDateTime now = timeProvider.nowDateTime();
+        attendance.recordLeave(now);
+
         updateEmployeeWorkStatus(employeeId, WorkStatus.OFF_WORK);
 
         return new TodayAttResDto(commuteRepository.save(attendance), false);
@@ -113,7 +111,7 @@ public class CommuteService {
             throw new BusinessException("이미 자리비움 상태입니다.");
         }
 
-        employee.updateWorkStatus(WorkStatus.AWAY);
+        updateEmployeeWorkStatus(employee, WorkStatus.AWAY);
     }
 
 
@@ -132,6 +130,10 @@ public class CommuteService {
         findEmployee(employeeId).updateWorkStatus(status);
     }
 
+    private void updateEmployeeWorkStatus(Employee employee, WorkStatus status) {
+        employee.updateWorkStatus(status);
+    }
+
     private void validateAttendanceRecord(Long companyId, Long employeeId) {
         commuteRepository.findToday(companyId, employeeId)
                 .orElseThrow(() -> new BusinessException("출근 기록이 없습니다. 자리비움은 출근 후에 가능합니다."));
@@ -143,7 +145,7 @@ public class CommuteService {
     }
 
     private void validateCheckOutTime(LocalTime endTimeThreshold) {
-        LocalTime now = LocalTime.now().withNano(0);
+        LocalTime now = timeProvider.nowTime().withNano(0);
         if (now.isBefore(endTimeThreshold.withNano(0))) {
             throw new BusinessException("퇴근 시간(" + endTimeThreshold + ") 이전이라서 퇴근할 수 없습니다.");
         }
@@ -152,8 +154,7 @@ public class CommuteService {
     @Transactional(readOnly = true)
     public WorkStatus getEmployeeWorkStatus(Long companyId, Long employeeId) {
 
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new BusinessException("사원 정보를 찾을 수 없습니다."));
+        Employee employee = findEmployee(employeeId);
 
         if (!employee.getCompany().getId().equals(companyId)) {
             throw new BusinessException("다른 회사의 사원입니다.");
@@ -164,24 +165,15 @@ public class CommuteService {
 
     @Transactional
     public void returnFromOutsideOrTrip(Long companyId, Long employeeId) {
-        LocalDate today = LocalDate.now();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = timeProvider.today();
+        LocalDateTime now = timeProvider.nowDateTime();
 
         AttendanceEvent event = attendanceEventRepository.findActiveEvent(employeeId, today)
                 .orElseThrow(() -> new NotFoundException("현재 진행 중인 출장/외근 기록이 없습니다."));
 
         Attendance att = commuteRepository
                 .findByCompanyIdAndEmployeeIdAndWorkDate(companyId, employeeId, today)
-                .orElseGet(() -> Attendance.builder()
-                        .companyId(companyId)
-                        .employeeId(employeeId)
-                        .workDate(today)
-                        .commuteAt(null)
-                        .leaveAt(null)
-                        .isCorrected(false)
-                        .status(AttendanceStatus.ON_TIME)
-                        .build()
-                );
+                .orElseGet(() -> Attendance.createForReturn(companyId, employeeId, today));
 
 
         if (att.getCommuteAt() == null) {
@@ -193,10 +185,7 @@ public class CommuteService {
 
         commuteRepository.save(att);
 
-        employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new NotFoundException("사원을 찾을 수 없습니다."))
-                .updateWorkStatus(WorkStatus.WORKING);
-
+        updateEmployeeWorkStatus(employeeId, WorkStatus.WORKING);
         event.updateEndDate(today.minusDays(1));
     }
 

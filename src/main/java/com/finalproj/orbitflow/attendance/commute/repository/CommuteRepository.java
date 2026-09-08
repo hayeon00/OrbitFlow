@@ -5,10 +5,13 @@ import com.finalproj.orbitflow.attendance.commute.enums.AttendanceStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +26,35 @@ import java.util.Optional;
 
 @Repository
 public interface CommuteRepository extends JpaRepository<Attendance, Long> {
+
+    @Modifying
+    @Query(value = """
+        INSERT INTO attendance (company_id, employee_id, work_date, commute_at, status, created_at)
+        VALUES (:companyId, :employeeId, CURRENT_DATE, :commuteAt, :status, NOW())
+        ON DUPLICATE KEY UPDATE id = id
+    """, nativeQuery = true)
+    int insertCheckInIgnoreDuplicate(
+            @Param("companyId") Long companyId,
+            @Param("employeeId") Long employeeId,
+            @Param("commuteAt") LocalDateTime commuteAt,
+            @Param("status") String status
+    );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         Optional<Attendance> findByCompanyIdAndEmployeeIdAndWorkDate(Long companyId, Long employeeId,
                         LocalDate workDate);

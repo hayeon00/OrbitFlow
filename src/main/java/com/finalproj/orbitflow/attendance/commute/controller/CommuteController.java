@@ -7,6 +7,7 @@ import com.finalproj.orbitflow.attendance.commute.service.CommuteService;
 import com.finalproj.orbitflow.global.common.ResponseDto;
 import com.finalproj.orbitflow.global.security.SecurityUser;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.formula.functions.Today;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,7 +27,7 @@ public class CommuteController {
     private final CommuteService commuteService;
 
     @GetMapping("/active-rule")
-    public ResponseEntity<?> getActiveRule(@AuthenticationPrincipal SecurityUser user) {
+    public ResponseEntity<ResponseDto<ActiveRuleResDto>> getActiveRule(@AuthenticationPrincipal SecurityUser user) {
         ActiveRuleResDto rule = commuteService.getActiveRule(user.getCompanyId(), user.getEmployeeId());
 
         return ResponseEntity.ok(new ResponseDto<>(
@@ -38,7 +39,7 @@ public class CommuteController {
 
 
     @GetMapping("/today")
-    public ResponseEntity<?> getTodayAttendance(@AuthenticationPrincipal SecurityUser user) {
+    public ResponseEntity<ResponseDto<TodayAttResDto>> getTodayAttendance(@AuthenticationPrincipal SecurityUser user) {
         TodayAttResDto response = commuteService.getTodayAttendance(user.getCompanyId(), user.getEmployeeId());
 
         return ResponseEntity.ok(new ResponseDto<>(
@@ -49,7 +50,7 @@ public class CommuteController {
     }
 
     @PostMapping("/checkin")
-    public ResponseEntity<?> checkIn(@AuthenticationPrincipal SecurityUser user) {
+    public ResponseEntity<ResponseDto<TodayAttResDto>> checkIn(@AuthenticationPrincipal SecurityUser user) {
         TodayAttResDto result = commuteService.checkIn(user.getCompanyId(), user.getEmployeeId(),null);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(new ResponseDto<>(
@@ -60,7 +61,7 @@ public class CommuteController {
     }
 
     @PostMapping("/checkout")
-    public ResponseEntity<?> checkOut(@AuthenticationPrincipal SecurityUser user) {
+    public ResponseEntity<ResponseDto<TodayAttResDto>> checkOut(@AuthenticationPrincipal SecurityUser user) {
         TodayAttResDto result = commuteService.checkOut(user.getCompanyId(), user.getEmployeeId());
 
         return ResponseEntity.ok(new ResponseDto<>(
@@ -71,7 +72,7 @@ public class CommuteController {
     }
 
     @PostMapping("/away/start")
-    public ResponseEntity<?> startAway(@AuthenticationPrincipal SecurityUser user) {
+    public ResponseEntity<ResponseDto<TodayAttResDto>> startAway(@AuthenticationPrincipal SecurityUser user) {
         commuteService.startAway(user.getCompanyId(), user.getEmployeeId());
         TodayAttResDto result = commuteService.getTodayAttendance(user.getCompanyId(), user.getEmployeeId());
 
@@ -83,7 +84,7 @@ public class CommuteController {
     }
 
     @PostMapping("/away/end")
-    public ResponseEntity<?> endAway(@AuthenticationPrincipal SecurityUser user) {
+    public ResponseEntity<ResponseDto<TodayAttResDto>> endAway(@AuthenticationPrincipal SecurityUser user) {
         commuteService.endAway(user.getCompanyId(), user.getEmployeeId());
         TodayAttResDto result = commuteService.getTodayAttendance(user.getCompanyId(), user.getEmployeeId());
 
@@ -95,7 +96,7 @@ public class CommuteController {
     }
 
     @GetMapping("/work-status/{employeeId}")
-    public ResponseEntity<?> getEmployeeWorkStatus(
+    public ResponseEntity<ResponseDto<EmployeeWorkStatusResDto>> getEmployeeWorkStatus(
             @PathVariable Long employeeId,
             @AuthenticationPrincipal SecurityUser user
     ) {
@@ -114,7 +115,7 @@ public class CommuteController {
     }
 
     @PostMapping("/return")
-    public ResponseEntity<?> returnFromOutsideOrTrip(@AuthenticationPrincipal SecurityUser user) {
+    public ResponseEntity<ResponseDto<Void>> returnFromOutsideOrTrip(@AuthenticationPrincipal SecurityUser user) {
         commuteService.returnFromOutsideOrTrip(
                 user.getCompanyId(),
                 user.getEmployeeId()
