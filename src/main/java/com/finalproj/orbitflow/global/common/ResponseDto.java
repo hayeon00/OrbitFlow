@@ -18,4 +18,20 @@ public class ResponseDto<T> {
         this.data = data;
     }
 
+    public static <T> ResponseDto<T> ok(String message, T data) {
+        return new ResponseDto<>(HttpStatus.OK, message, data);
+    }
+
+    public static <T> ResponseDto<T> created(String message, T data) {
+        return new ResponseDto<>(HttpStatus.CREATED, message, data);
+    }
+
+    public static ResponseDto<Void> ok(String message) {
+        return new ResponseDto<>(HttpStatus.OK, message, null);
+    }
+
+    public static ResponseDto<Void> created(String message) {
+        return new ResponseDto<>(HttpStatus.CREATED, message, null);
+    }
+
 }
