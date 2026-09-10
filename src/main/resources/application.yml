@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: local   # ?? ??? dev
+    active: dev   # ?? ??? dev
 
 server:
   port: 8090
