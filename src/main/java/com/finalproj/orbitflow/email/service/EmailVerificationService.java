@@ -4,10 +4,10 @@ import com.finalproj.orbitflow.email.entity.EmailVerificationToken;
 import com.finalproj.orbitflow.email.enums.EmailTokenType;
 import com.finalproj.orbitflow.email.repository.EmailVerificationTokenRepository;
 import com.finalproj.orbitflow.hr.employee.entity.Employee;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 
 /**
  * Please explain the class!!!
@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Value;
  * @since : 2026-01-01 목요일
  */
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class EmailVerificationService {
 
@@ -26,6 +25,14 @@ public class EmailVerificationService {
 
     @Value("${app.public-base-url}")
     private String baseUrl;
+
+    public EmailVerificationService(
+            EmailVerificationTokenRepository tokenRepository,
+            @Qualifier("consoleMailSender") MailSender mailSender
+    ) {
+        this.tokenRepository = tokenRepository;
+        this.mailSender = mailSender;
+    }
 
     public void sendActivateMail(Employee employee) {
         EmailVerificationToken token =
@@ -65,7 +72,6 @@ public class EmailVerificationService {
         if (token.isExpired()) throw new IllegalStateException("만료된 토큰입니다.");
         if (token.getType() != type) throw new IllegalStateException("타입이 올바르지 않습니다.");
 
-        // markUsed() 여기서 하지 않음
         return token;
     }
 
@@ -73,10 +79,8 @@ public class EmailVerificationService {
         token.markUsed();
     }
 
-
     public Employee verifyAndGetEmployee(String tokenValue, EmailTokenType type) {
         EmailVerificationToken token = verify(tokenValue, type);
         return token.getEmployee();
     }
-
 }
