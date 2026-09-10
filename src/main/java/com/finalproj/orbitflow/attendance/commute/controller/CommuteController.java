@@ -53,9 +53,9 @@ public class CommuteController {
     public ResponseEntity<ResponseDto<TodayAttResDto>> checkIn(@AuthenticationPrincipal SecurityUser user) {
         TodayAttResDto result = commuteService.checkIn(user.getCompanyId(), user.getEmployeeId(),null);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(new ResponseDto<>(
-                HttpStatus.CREATED,
-                "출근 처리가 완료되었습니다.",
+        return ResponseEntity.ok(new ResponseDto<>(
+                HttpStatus.OK,
+                "출근 상태가 정상적으로 반영되었습니다.",
                 result
         ));
     }

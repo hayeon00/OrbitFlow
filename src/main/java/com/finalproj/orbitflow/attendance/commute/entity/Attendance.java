@@ -16,9 +16,19 @@ import java.time.LocalDateTime;
 
 
 @Entity
-@Table(name = "attendance", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"employee_id", "work_date"})
-})
+@Table(
+        name = "attendance",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_att_date",
+                        columnNames = {
+                                "company_id",
+                                "employee_id",
+                                "work_date"
+                        }
+                )
+        }
+)
 @Getter
 @Builder
 @AllArgsConstructor
@@ -82,15 +92,48 @@ public class Attendance {
         }
     }
 
-    public void recordLeave() {
+    public void recordLeave(LocalDateTime leaveAt) {
         if (this.leaveAt != null) {
             throw new BusinessException("이미 퇴근 처리되었습니다.");
         }
-        this.leaveAt = LocalDateTime.now();
+        this.leaveAt = leaveAt;
     }
 
     public void updateStatusAutomatically(AttendanceStatus status) {
         this.status = status;
+    }
+
+    public static Attendance createForCheckIn(
+            Long companyId,
+            Long employeeId,
+            LocalDateTime commuteAt,
+            AttendanceStatus status
+    ) {
+        return Attendance.builder()
+                .companyId(companyId)
+                .employeeId(employeeId)
+                .workDate(commuteAt.toLocalDate())
+                .commuteAt(commuteAt)
+                .leaveAt(null)
+                .status(status)
+                .isCorrected(false)
+                .build();
+    }
+
+    public static Attendance createForReturn(
+            Long companyId,
+            Long employeeId,
+            LocalDate workDate
+    ) {
+        return Attendance.builder()
+                .companyId(companyId)
+                .employeeId(employeeId)
+                .workDate(workDate)
+                .commuteAt(null)
+                .leaveAt(null)
+                .status(AttendanceStatus.ON_TIME)
+                .isCorrected(false)
+                .build();
     }
 
 

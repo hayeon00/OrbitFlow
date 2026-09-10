@@ -29,15 +29,38 @@ public interface CommuteRepository extends JpaRepository<Attendance, Long> {
 
     @Modifying
     @Query(value = """
-        INSERT INTO attendance (company_id, employee_id, work_date, commute_at, status, created_at)
-        VALUES (:companyId, :employeeId, CURRENT_DATE, :commuteAt, :status, NOW())
+        INSERT INTO attendance (company_id, employee_id, work_date, commute_at, status)
+        VALUES (:companyId, :employeeId, :workDate, :commuteAt, :status)
         ON DUPLICATE KEY UPDATE id = id
     """, nativeQuery = true)
-    int insertCheckInIgnoreDuplicate(
+    void insertCheckInIgnoreDuplicate(
             @Param("companyId") Long companyId,
             @Param("employeeId") Long employeeId,
+            @Param("workDate") LocalDate workDate,
             @Param("commuteAt") LocalDateTime commuteAt,
             @Param("status") String status
+    );
+
+    @Modifying
+    @Query("""
+        UPDATE Attendance a
+        SET a.leaveAt = :leaveAt
+        WHERE a.companyId = :companyId
+          AND a.employeeId = :employeeId
+          AND a.workDate = :today
+          AND a.leaveAt IS NULL
+    """)
+    int updateLeaveAtIfNull(
+            @Param("companyId") Long companyId,
+            @Param("employeeId") Long employeeId,
+            @Param("today") LocalDate today,
+            @Param("leaveAt") LocalDateTime leaveAt
+    );
+
+    Optional<Attendance> findByCompanyIdAndEmployeeIdAndWorkDate(
+            Long companyId,
+            Long employeeId,
+            LocalDate workDate
     );
 
 
@@ -49,19 +72,6 @@ public interface CommuteRepository extends JpaRepository<Attendance, Long> {
 
 
 
-
-
-
-
-
-
-
-        Optional<Attendance> findByCompanyIdAndEmployeeIdAndWorkDate(Long companyId, Long employeeId,
-                        LocalDate workDate);
-
-        default Optional<Attendance> findToday(Long companyId, Long employeeId) {
-                return findByCompanyIdAndEmployeeIdAndWorkDate(companyId, employeeId, LocalDate.now());
-        }
 
         @Query("SELECT a FROM Attendance a WHERE a.employeeId = :employeeId " +
                         "AND a.workDate BETWEEN :startDate AND :endDate " +
