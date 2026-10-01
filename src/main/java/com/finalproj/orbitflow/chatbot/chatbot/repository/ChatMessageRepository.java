@@ -12,7 +12,12 @@ import java.util.List;
  * @filename : ChatMessageRepository
  * @since : 2026. 1. 6. 화요일
  */
-public interface ChatMessageRepository extends JpaRepository<ChatMessage,String> {
+public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>{
 
     List<ChatMessage> findByConversationIdOrderByCreatedAtAscIdAsc(Long conversationId);
+
+    List<ChatMessage> findTop200ByCompanyIdAndRoleOrderByCreatedAtDesc(
+            Long companyId,
+            ChatMessage.Role role
+    );
 }

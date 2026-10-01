@@ -53,3 +53,5 @@ logs/
 .env
 application-local.yml
 /web.pem
+
+/uploads/

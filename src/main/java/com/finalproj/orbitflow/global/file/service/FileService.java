@@ -10,8 +10,6 @@ import com.finalproj.orbitflow.hr.company.entity.Company;
 import com.finalproj.orbitflow.hr.company.repository.CompanyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,22 +20,11 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriUtils;
-import software.amazon.awssdk.core.ResponseInputStream;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -45,29 +32,41 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Please explain the class!!!
+ * 파일 공통 서비스
+ *
+ * 실제 파일 저장 위치(S3 / Local)는 FileStorage 구현체가 담당한다.
+ *
+ * local profile -> LocalFileStorage
+ * prod profile  -> S3FileStorage
  *
  * @author : Choi MinHyeok
  * @filename : FileService
- * @since : 26. 1. 1. 목요일
- **/
-
+ * @since : 26. 1. 1.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @Slf4j
 public class FileService {
 
-    private final S3Client s3Client;
-    private final S3Presigner s3Presigner;
     private final FileRepository fileRepository;
     private final CompanyRepository companyRepository;
+
+    /**
+     * 실제 파일 저장소.
+     *
+     * local:
+     * LocalFileStorage
+     *
+     * prod:
+     * S3FileStorage
+     */
     private final FileStorage fileStorage;
 
 
-    @Value("${cloud.aws.s3.bucket}")
-    private String bucket;
-
+    /**
+     * MultipartFile 업로드
+     */
     @Transactional
     public File upload(
             Long companyId,
@@ -75,41 +74,64 @@ public class FileService {
             MultipartFile multipartFile
     ) {
 
+        Company company = companyRepository
+                .findById(companyId)
+                .orElseThrow(
+                        () -> new NotFoundException(
+                                "회사 정보를 찾을 수 없습니다. companyId="
+                                        + companyId
+                        )
+                );
 
-        Company company = companyRepository.findById(companyId)
-                .orElseThrow();
-
-
-        String origin = Optional.ofNullable(multipartFile.getOriginalFilename())
-                .filter(s -> !s.isBlank())
-                .orElse("unknown");
+        String originFileName =
+                Optional.ofNullable(
+                                multipartFile.getOriginalFilename()
+                        )
+                        .filter(name -> !name.isBlank())
+                        .orElse("unknown");
 
         try {
+
             return saveFileInternal(
                     company,
                     domain,
-                    origin,
+                    originFileName,
                     multipartFile.getContentType(),
                     multipartFile.getSize(),
                     multipartFile.getInputStream()
             );
+
         } catch (IOException e) {
-            throw new RuntimeException(e);
+
+            throw new RuntimeException(
+                    "업로드 파일을 읽는 중 오류가 발생했습니다.",
+                    e
+            );
         }
     }
 
 
+    /**
+     * 시스템에서 생성한 PDF 저장
+     */
     @Transactional
     public File saveGeneratedPdf(
             Long companyId,
             Long documentId,
             byte[] pdfBytes
     ) {
-        Company company = companyRepository.findById(companyId)
-                .orElseThrow();
 
+        Company company = companyRepository
+                .findById(companyId)
+                .orElseThrow(
+                        () -> new NotFoundException(
+                                "회사 정보를 찾을 수 없습니다. companyId="
+                                        + companyId
+                        )
+                );
 
-        String fileName = "document-" + documentId + ".pdf";
+        String fileName =
+                "document-" + documentId + ".pdf";
 
         return saveFileInternal(
                 company,
@@ -122,6 +144,9 @@ public class FileService {
     }
 
 
+    /**
+     * 실제 파일 저장 + DB 메타데이터 저장
+     */
     private File saveFileInternal(
             Company company,
             FileDomain domain,
@@ -130,189 +155,467 @@ public class FileService {
             long size,
             InputStream inputStream
     ) {
-        String objectKey = createObjectKey(company.getId(), domain, originFileName);
+
+        String objectKey =
+                createObjectKey(
+                        company.getId(),
+                        domain,
+                        originFileName
+                );
+
+        boolean storageSaved = false;
 
         try {
-            // 1️⃣ S3 업로드
-            s3Client.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(bucket)
-                            .key(objectKey)
-                            .contentType(contentType)
-                            .build(),
-                    RequestBody.fromInputStream(inputStream, size)
+
+            /*
+             * 1. 실제 파일 저장
+             *
+             * local:
+             * ./uploads/...
+             *
+             * prod:
+             * S3
+             */
+            fileStorage.save(
+                    objectKey,
+                    contentType,
+                    size,
+                    inputStream
             );
 
-            // 2️⃣ DB 저장
+            storageSaved = true;
+
+            /*
+             * 2. DB 메타데이터 저장
+             */
             File file = File.builder()
                     .company(company)
                     .domain(domain)
                     .objectKey(objectKey)
                     .originFile(originFileName)
-                    .sysFile(extractSysFile(objectKey))
+                    .sysFile(
+                            extractSysFile(objectKey)
+                    )
                     .contentType(contentType)
                     .fileSize(size)
                     .build();
 
-            File savedFile = fileRepository.save(file);
+            File savedFile =
+                    fileRepository.save(file);
 
-            // 3️⃣ 트랜잭션 보상
-            if (TransactionSynchronizationManager.isActualTransactionActive()) {
-                TransactionSynchronizationManager.registerSynchronization(
+
+            /*
+             * 3. DB Transaction rollback 시
+             * 이미 저장한 실제 파일 삭제
+             */
+            if (
+                    TransactionSynchronizationManager
+                            .isActualTransactionActive()
+            ) {
+
+                TransactionSynchronizationManager
+                        .registerSynchronization(
+                                new TransactionSynchronization() {
+
+                                    @Override
+                                    public void afterCompletion(
+                                            int status
+                                    ) {
+
+                                        if (
+                                                status
+                                                        == STATUS_ROLLED_BACK
+                                        ) {
+
+                                            try {
+
+                                                fileStorage.delete(
+                                                        objectKey
+                                                );
+
+                                            } catch (Exception e) {
+
+                                                log.error(
+                                                        "[FILE_ROLLBACK_DELETE_FAIL] objectKey={}",
+                                                        objectKey,
+                                                        e
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                        );
+            }
+
+            return savedFile;
+
+        } catch (Exception e) {
+
+            /*
+             * 저장 중 실패했는데
+             * 실제 파일까지 생성되어 있다면 삭제
+             */
+            if (storageSaved) {
+
+                try {
+
+                    fileStorage.delete(
+                            objectKey
+                    );
+
+                } catch (Exception deleteException) {
+
+                    log.error(
+                            "[FILE_SAVE_COMPENSATION_DELETE_FAIL] objectKey={}",
+                            objectKey,
+                            deleteException
+                    );
+                }
+            }
+
+            log.error(
+                    "[FILE_SAVE_FAIL] objectKey={}, originFileName={}",
+                    objectKey,
+                    originFileName,
+                    e
+            );
+
+            throw new RuntimeException(
+                    "파일 저장 중 오류 발생",
+                    e
+            );
+        }
+    }
+
+
+    /**
+     * 파일 다운로드
+     */
+    public ResponseEntity<Resource> download(
+            Long fileId,
+            Long companyId
+    ) {
+
+        File file = fileRepository
+                .findByIdAndCompany_Id(
+                        fileId,
+                        companyId
+                )
+                .orElseThrow(
+                        () -> new NotFoundException(
+                                "파일을 찾을 수 없습니다. id="
+                                        + fileId
+                        )
+                );
+
+        Resource resource =
+                fileStorage.loadAsResource(
+                        file.getObjectKey()
+                );
+
+        MediaType mediaType =
+                MediaType.APPLICATION_OCTET_STREAM;
+
+        if (
+                file.getContentType() != null
+                        && !file.getContentType().isBlank()
+        ) {
+
+            try {
+
+                mediaType =
+                        MediaType.parseMediaType(
+                                file.getContentType()
+                        );
+
+            } catch (Exception e) {
+
+                log.warn(
+                        "[INVALID_CONTENT_TYPE] fileId={}, contentType={}",
+                        file.getId(),
+                        file.getContentType()
+                );
+            }
+        }
+
+        String encodedName =
+                UriUtils.encode(
+                        Optional.ofNullable(
+                                        file.getOriginFile()
+                                )
+                                .orElse("download"),
+                        StandardCharsets.UTF_8
+                );
+
+        ResponseEntity.BodyBuilder response =
+                ResponseEntity.ok()
+                        .contentType(mediaType)
+                        .header(
+                                HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\""
+                                        + encodedName
+                                        + "\""
+                        );
+
+        if (
+                file.getFileSize() != null
+                        && file.getFileSize() >= 0
+        ) {
+
+            response.contentLength(
+                    file.getFileSize()
+            );
+        }
+
+        return response.body(resource);
+    }
+
+
+    /**
+     * Presigned URL 생성
+     *
+     * S3 환경에서는 실제 Presigned URL 생성.
+     *
+     * LocalFileStorage에서는 구현 방식에 따라
+     * UnsupportedOperationException이 발생할 수 있다.
+     */
+    public PresignedUrlResDto createPresignedDownloadUrl(
+            Long companyId,
+            Long fileId
+    ) {
+
+        File file = fileRepository
+                .findByIdAndCompany_Id(
+                        fileId,
+                        companyId
+                )
+                .orElseThrow(
+                        () -> new NotFoundException(
+                                "파일을 찾을 수 없습니다. id="
+                                        + fileId
+                        )
+                );
+
+        long expirationMinutes = 5L;
+
+        String url =
+                fileStorage.createPresignedDownloadUrl(
+                        file.getObjectKey(),
+                        Optional.ofNullable(
+                                        file.getOriginFile()
+                                )
+                                .orElse("download"),
+                        expirationMinutes
+                );
+
+        return new PresignedUrlResDto(
+                url,
+                LocalDateTime.now()
+                        .plusMinutes(
+                                expirationMinutes
+                        )
+        );
+    }
+
+
+    /**
+     * 실제 파일 삭제
+     */
+    public void deleteObject(
+            String objectKey
+    ) {
+
+        try {
+
+            fileStorage.delete(
+                    objectKey
+            );
+
+        } catch (Exception ex) {
+
+            log.error(
+                    "[FILE_DELETE_FAIL] objectKey={}",
+                    objectKey,
+                    ex
+            );
+        }
+    }
+
+
+    /**
+     * 현재 Transaction commit 이후
+     * 실제 저장소 파일 삭제
+     */
+    public void deleteObjectAfterCommit(
+            String objectKey
+    ) {
+
+        if (
+                !TransactionSynchronizationManager
+                        .isActualTransactionActive()
+        ) {
+
+            deleteObject(
+                    objectKey
+            );
+
+            return;
+        }
+
+        TransactionSynchronizationManager
+                .registerSynchronization(
                         new TransactionSynchronization() {
+
                             @Override
-                            public void afterCompletion(int status) {
-                                if (status == STATUS_ROLLED_BACK) {
-                                    deleteObject(objectKey);
+                            public void afterCommit() {
+
+                                try {
+
+                                    deleteObject(
+                                            objectKey
+                                    );
+
+                                } catch (Exception e) {
+
+                                    log.error(
+                                            "[FILE_DELETE_AFTER_COMMIT_FAIL] objectKey={}",
+                                            objectKey,
+                                            e
+                                    );
                                 }
                             }
                         }
                 );
-            }
-            return savedFile;
-        } catch (Exception e) {
-            deleteObject(objectKey);
-            throw new RuntimeException("파일 저장 중 오류 발생", e);
-        }
     }
 
 
-    public ResponseEntity<Resource> download(Long fileId, Long companyId) {
-        File file = fileRepository.findByIdAndCompany_Id(fileId, companyId)
-                .orElseThrow(() -> new NotFoundException("파일을 찾을 수 없습니다. id=" + fileId));
+    /**
+     * 이미지 바이트 반환
+     */
+    public ResponseEntity<byte[]> streamImage(
+            File file
+    ) {
 
-        ResponseInputStream<GetObjectResponse> s3Object = s3Client.getObject(
-                GetObjectRequest.builder()
-                        .bucket(bucket)
-                        .key(file.getObjectKey())
-                        .build()
-        );
+        byte[] bytes =
+                fileStorage.readAllBytes(
+                        file.getObjectKey()
+                );
 
-        InputStreamResource resource = new InputStreamResource(s3Object);
+        MediaType mediaType =
+                MediaType.APPLICATION_OCTET_STREAM;
 
-        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
-        if (file.getContentType() != null && !file.getContentType().isBlank()) {
-            mediaType = MediaType.parseMediaType(file.getContentType());
+        if (
+                file.getContentType() != null
+                        && !file.getContentType().isBlank()
+        ) {
+
+            try {
+
+                mediaType =
+                        MediaType.parseMediaType(
+                                file.getContentType()
+                        );
+
+            } catch (Exception e) {
+
+                log.warn(
+                        "[INVALID_IMAGE_CONTENT_TYPE] fileId={}, contentType={}",
+                        file.getId(),
+                        file.getContentType()
+                );
+            }
         }
-
-        String encodedName = UriUtils.encode(file.getOriginFile(), StandardCharsets.UTF_8);
 
         return ResponseEntity.ok()
                 .contentType(mediaType)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedName + "\"")
-                .contentLength(file.getFileSize() != null ? file.getFileSize() : -1)
-                .body(resource);
-    }
-
-    public PresignedUrlResDto createPresignedDownloadUrl(Long companyId, Long fileId) {
-        File file = fileRepository.findByIdAndCompany_Id(fileId, companyId)
-                .orElseThrow(() -> new NotFoundException("파일을 찾을 수 없습니다. id=" + fileId));
-
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(bucket)
-                .key(file.getObjectKey())
-                .responseContentDisposition(
-                        "attachment; filename=\"" +
-                                UriUtils.encode(file.getOriginFile(), StandardCharsets.UTF_8) + "\""
-                )
-                .build();
-
-        PresignedGetObjectRequest presignedRequest =
-                s3Presigner.presignGetObject(
-                        GetObjectPresignRequest.builder()
-                                .signatureDuration(Duration.ofMinutes(5))
-                                .getObjectRequest(getObjectRequest)
-                                .build()
-                );
-
-        return new PresignedUrlResDto(
-                presignedRequest.url().toString(),
-                LocalDateTime.now().plusMinutes(5)
-        );
-    }
-
-    public void deleteObject(String objectKey) {
-        try {
-            s3Client.deleteObject(
-                    DeleteObjectRequest.builder()
-                            .bucket(bucket)
-                            .key(objectKey)
-                            .build()
-            );
-        } catch (Exception ex) {
-            log.error("S3 delete failed. objectKey={}", objectKey, ex);
-        }
-    }
-
-    // 이 함수 호출하면 트랜잭션 닫힘
-    public void deleteObjectAfterCommit(String objectKey) {
-
-        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-            // 트랜잭션 없으면 즉시 삭제
-            deleteObject(objectKey);
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            deleteObject(objectKey);
-                        } catch (Exception e) {
-                            log.error(
-                                    "[S3_DELETE_FAIL] objectKey={}",
-                                    objectKey,
-                                    e
-                            );
-                        }
-                    }
-                }
-        );
-    }
-
-
-    public ResponseEntity<byte[]> streamImage(File file) {
-
-        byte[] bytes = downloadFromS3(file.getObjectKey());
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(file.getContentType()))
                 .body(bytes);
     }
 
-    /*
-     * helper
-     * */
 
-    private String createObjectKey(Long companyId, FileDomain domain, String originFileName) {
-        String uuid = UUID.randomUUID().toString();
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM"));
-        return "company/%d/%s/%s/%s_%s".formatted(companyId, domain.getPath(), datePath, uuid, originFileName);
+    /**
+     * 내부용 Resource 로드
+     */
+    public Resource loadAsResource(
+            File file
+    ) {
+
+        return fileStorage.loadAsResource(
+                file.getObjectKey()
+        );
     }
 
-    private String extractSysFile(String objectKey) {
-        return objectKey.substring(objectKey.lastIndexOf('/') + 1);
-    }
 
+    /**
+     * 저장 Object Key 생성
+     *
+     * 예:
+     *
+     * company/1/chat/2026/10/
+     * uuid_manual.pdf
+     */
+    private String createObjectKey(
+            Long companyId,
+            FileDomain domain,
+            String originFileName
+    ) {
 
-    private byte[] downloadFromS3(String objectKey) {
-        ResponseInputStream<GetObjectResponse> s3Object =
-                s3Client.getObject(
-                        GetObjectRequest.builder()
-                                .bucket(bucket)
-                                .key(objectKey)
-                                .build()
+        String uuid =
+                UUID.randomUUID()
+                        .toString();
+
+        String datePath =
+                LocalDate.now()
+                        .format(
+                                DateTimeFormatter.ofPattern(
+                                        "yyyy/MM"
+                                )
+                        );
+
+        /*
+         * 파일명 안의 경로 문자 제거.
+         *
+         * 클라이언트가 이상한 파일명을 보내도
+         * objectKey 구조가 깨지지 않도록 한다.
+         */
+        String safeFileName =
+                sanitizeFileName(
+                        originFileName
                 );
 
-        try {
-            return s3Object.readAllBytes();
-        } catch (IOException e) {
-            throw new RuntimeException("이미지 다운로드 실패", e);
-        }
+        return "company/%d/%s/%s/%s_%s"
+                .formatted(
+                        companyId,
+                        domain.getPath(),
+                        datePath,
+                        uuid,
+                        safeFileName
+                );
     }
 
-    public Resource loadAsResource(File file) {
-        return fileStorage.loadAsResource(file.getObjectKey());
+
+    /**
+     * objectKey 마지막 파일명 추출
+     */
+    private String extractSysFile(
+            String objectKey
+    ) {
+
+        return objectKey.substring(
+                objectKey.lastIndexOf('/')
+                        + 1
+        );
+    }
+
+
+    /**
+     * 파일명에 포함된 경로 문자 제거
+     */
+    private String sanitizeFileName(
+            String fileName
+    ) {
+
+        return fileName
+                .replace("\\", "_")
+                .replace("/", "_");
     }
 }
