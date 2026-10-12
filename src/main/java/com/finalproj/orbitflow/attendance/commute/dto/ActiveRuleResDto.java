@@ -23,9 +23,4 @@ public class ActiveRuleResDto {
     private LocalTime endTime;
     private String ruleType; // "DEFAULT" (기본), "EXCEPTION" (예외) 구분용
 
-    // 기본 생성자 외에 편의를 위한 생성자
-    public ActiveRuleResDto(LocalTime startTime, LocalTime endTime) {
-        this.startTime = startTime;
-        this.endTime = endTime;
-    }
 }

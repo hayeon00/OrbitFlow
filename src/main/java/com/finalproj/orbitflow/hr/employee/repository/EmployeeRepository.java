@@ -3,9 +3,11 @@ package com.finalproj.orbitflow.hr.employee.repository;
 import com.finalproj.orbitflow.hr.employee.entity.Employee;
 import com.finalproj.orbitflow.hr.employee.enums.EmployeeStatus;
 import com.finalproj.orbitflow.hr.employee.enums.WorkStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -257,5 +259,17 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
                               and e.status = com.finalproj.orbitflow.hr.employee.enums.EmployeeStatus.ACTIVE
                         """)
         List<Employee> findActiveForSidebar(Long companyId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+    SELECT e
+    FROM Employee e
+    WHERE e.id = :employeeId
+      AND e.company.id = :companyId
+""")
+    Optional<Employee> findByIdAndCompanyIdForUpdate(
+            @Param("employeeId") Long employeeId,
+            @Param("companyId") Long companyId
+    );
 
 }

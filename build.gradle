@@ -104,6 +104,11 @@ dependencies {
     testCompileOnly "org.projectlombok:lombok"
     testAnnotationProcessor "org.projectlombok:lombok"
 
+    // MySQL 통합 테스트 (Spring Boot 4 / Testcontainers 2.x)
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-mysql'
+
 }
 
 tasks.named('test') {

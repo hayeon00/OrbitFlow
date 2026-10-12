@@ -54,8 +54,7 @@ public class CommuteService {
     }
 
     private ActiveRuleResDto getActiveRule(Long companyId, Long employeeId, LocalDate workDate) {
-        return employeeRuleRepository
-                .findActiveRuleByEmployeeIdAndDate(
+        return employeeRuleRepository.findActiveRuleByEmployeeIdAndDate(
                         employeeId,
                         workDate
                 )
@@ -220,7 +219,21 @@ public class CommuteService {
 
     @Transactional
     public void endAway(Long companyId, Long employeeId) {
-        updateEmployeeWorkStatus(employeeId, WorkStatus.WORKING);
+
+        Employee emplyee = findEmployee(employeeId);
+
+        if(!emplyee.getCompany().getId().equals(companyId)) {
+            throw new BusinessException("다른 회사의 사원입니다.");
+        }
+
+        if(emplyee.getWorkStatus() != WorkStatus.AWAY) {
+            throw new BusinessException("자리비움 상태에서만 업무에 복귀할 수 있습니다.");
+
+        }
+        updateEmployeeWorkStatus(
+                employeeId,
+                WorkStatus.WORKING
+        );
     }
 
 
