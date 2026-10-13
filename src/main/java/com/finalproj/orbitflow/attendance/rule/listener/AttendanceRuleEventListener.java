@@ -14,11 +14,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Please explain the class!!!
- *
- * @author : seunga03
- * @filename : RuleEventListener
- * @since : 2026-01-11 일요일
+ * 회사 생성 트랜잭션이 커밋된 후 기본 근태 규칙을 비동기로 초기화한다.
  */
 @Component
 @RequiredArgsConstructor
@@ -30,22 +26,35 @@ public class AttendanceRuleEventListener {
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(
-            phase = TransactionPhase.AFTER_COMMIT
-    )
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleCompanyCreated(CompanyCreatedEvent event) {
-
-        Company company = companyRepository.findById(event.getCompanyId())
-                .orElse(null);
-
-        if (company == null) {
-            return;
-        }
+        Long companyId = event.getCompanyId();
 
         try {
-            attendanceRuleService.createDefaultAttendanceRule(company);
-        } catch (Exception e) {
+            Company company = companyRepository.findById(companyId)
+                    .orElse(null);
 
+            if (company == null) {
+                log.warn(
+                        "기본 근태 규칙 초기화 대상 회사를 찾을 수 없습니다. companyId={}",
+                        companyId
+                );
+                return;
+            }
+
+            attendanceRuleService.createDefaultAttendanceRule(company);
+
+            log.info(
+                    "기본 근태 규칙 초기화 처리 완료. companyId={}",
+                    companyId
+            );
+
+        } catch (Exception e) {
+            log.error(
+                    "기본 근태 규칙 초기화 실패. companyId={}",
+                    companyId,
+                    e
+            );
         }
     }
 }
