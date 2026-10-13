@@ -16,7 +16,15 @@ import java.time.LocalTime;
 
 
 @Entity
-@Table(name = "attendance_rule")
+@Table(
+        name = "attendance_rule",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_attendance_rule_company",
+                        columnNames = "company_id"
+                )
+        }
+)
 @Getter
 @Builder
 @AllArgsConstructor
