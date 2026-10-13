@@ -11,6 +11,7 @@ import com.finalproj.orbitflow.attendance.rule.entity.EmployeeRule;
 import com.finalproj.orbitflow.attendance.rule.repository.AttendanceRuleRepository;
 import com.finalproj.orbitflow.attendance.rule.repository.EmployeeRuleRepository;
 import com.finalproj.orbitflow.global.exception.BusinessException;
+import com.finalproj.orbitflow.global.exception.InvalidRequestException;
 import com.finalproj.orbitflow.hr.company.entity.Company;
 import com.finalproj.orbitflow.hr.employee.entity.Employee;
 import com.finalproj.orbitflow.hr.employee.repository.EmployeeRepository;
@@ -66,11 +67,15 @@ public class AttendanceRuleService {
     ) {
         AttendanceRule rule = findDefaultRuleOrThrow(companyId);
 
-        rule.updateRule(
-                request.defaultStartTime(),
-                request.defaultEndTime(),
-                request.defaultBreakMinutes()
-        );
+        try {
+            rule.updateRule(
+                    request.defaultStartTime(),
+                    request.defaultEndTime(),
+                    request.defaultBreakMinutes()
+            );
+        } catch (IllegalArgumentException e) {
+            throw new InvalidRequestException(e.getMessage());
+        }
 
         return new DefaultRuleResDto(rule);
     }

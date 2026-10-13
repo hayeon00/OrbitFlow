@@ -58,19 +58,50 @@ public class AttendanceRule {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public void updateRule(LocalTime startTime, LocalTime endTime, Integer breakMinutes) {
-        validateWorkTimes(startTime, endTime);
+    public void updateRule(
+            LocalTime startTime,
+            LocalTime endTime,
+            Integer breakMinutes
+    ) {
 
-        this.defaultStartTime = startTime != null ? startTime : this.defaultStartTime;
-        this.defaultEndTime = endTime != null ? endTime : this.defaultEndTime;
-        this.defaultBreakMinutes = breakMinutes != null ? breakMinutes : this.defaultBreakMinutes;
+        LocalTime newStartTime =
+                startTime != null ? startTime : this.defaultStartTime;
+
+        LocalTime newEndTime =
+                endTime != null ? endTime : this.defaultEndTime;
+
+        Integer newBreakMinutes =
+                breakMinutes != null ? breakMinutes : this.defaultBreakMinutes;
+
+        validateWorkTimes(newStartTime, newEndTime);
+        validateBreakMinutes(newBreakMinutes);
+
+        this.defaultStartTime = newStartTime;
+        this.defaultEndTime = newEndTime;
+        this.defaultBreakMinutes = newBreakMinutes;
 
         this.updatedAt = LocalDateTime.now();
     }
 
     private void validateWorkTimes(LocalTime start, LocalTime end) {
-        if (start != null && end != null && !end.isAfter(start)) {
-            throw new IllegalArgumentException("퇴근 시간은 출근 시간보다 이후여야 합니다.");
+        if (start == null || end == null) {
+            throw new IllegalArgumentException(
+                    "출근 시간과 퇴근 시간은 필수입니다."
+            );
+        }
+
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException(
+                    "퇴근 시간은 출근 시간보다 이후여야 합니다."
+            );
+        }
+    }
+
+    private void validateBreakMinutes(Integer minutes) {
+        if (minutes != null && (minutes < 0 || minutes > 480)) {
+            throw new IllegalArgumentException(
+                    "휴게 시간은 0분에서 480분 사이여야 합니다."
+            );
         }
     }
 
