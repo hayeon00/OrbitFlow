@@ -189,51 +189,125 @@ public class ChatService {
 
         public String askQuestion(String question, Long companyId, Long categoryId) {
 
+            long retrievalStart = System.currentTimeMillis();
 
-                var questionEmbedding = embeddingModel.embed(question).content();
+            var questionEmbedding = embeddingModel.embed(question).content();
 
-                List<ManualMetadata> activeManuals = (categoryId != null)
-                        ? manualRepository.findByCompanyIdAndCategoryIdAndIsActiveTrueOrderByIdDesc(companyId, categoryId)
-                        : manualRepository.findAllByCompanyIdAndIsActiveTrueOrderByIdDesc(companyId);
+            List<ManualMetadata> activeManuals = (categoryId != null)
+                    ? manualRepository.findByCompanyIdAndCategoryIdAndIsActiveTrueOrderByIdDesc(
+                    companyId, categoryId)
+                    : manualRepository.findAllByCompanyIdAndIsActiveTrueOrderByIdDesc(companyId);
 
+            Set<String> activeFileIdSet = activeManuals.stream()
+                    .map(m -> m.getFile().getId().toString())
+                    .collect(Collectors.toSet());
 
-                Set<String> activeFileIdSet = activeManuals.stream()
-                                                .map(m -> m.getFile().getId().toString())
-                                                .collect(Collectors.toSet());
+            String companyIdStr = companyId.toString();
+            String categoryIdStr = categoryId == null
+                    ? null
+                    : categoryId.toString();
 
+            Filter filter = metadataKey("company_id").isEqualTo(companyIdStr);
 
+            if (categoryIdStr != null) {
+                filter = filter.and(
+                        metadataKey("category_id").isEqualTo(categoryIdStr)
+                );
+            }
 
-                String companyIdStr = companyId.toString();
-                String categoryIdStr = (categoryId == null ? null : categoryId.toString());
+            EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
+                    .queryEmbedding(questionEmbedding)
 
-                Filter filter = metadataKey("company_id").isEqualTo(companyIdStr);
-                if (categoryIdStr != null) {
-                    filter = filter.and(metadataKey("category_id").isEqualTo(categoryIdStr));
-                }
+                    // 아직 튜닝하지 않는다.
+                    .maxResults(50)
+                    .minScore(0.0)
 
-                EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
-                                                .queryEmbedding(questionEmbedding)
-                                                .maxResults(50)
-                                                .minScore(0.0)
-                                                .filter(filter)
-                                                .build();
+                    .filter(filter)
+                    .build();
 
+            EmbeddingSearchResult<TextSegment> result =
+                    embeddingStore.search(request);
 
-                EmbeddingSearchResult<TextSegment> result = embeddingStore.search(request);
-                List<EmbeddingMatch<TextSegment>> matches = result.matches();
+            List<EmbeddingMatch<TextSegment>> matches = result.matches();
 
-                String context = matches.stream()
-                                        .filter(m -> {
-                                            var metadata = m.embedded().metadata().toMap();
-                                            Object storedFileId = metadata.get("file_id");
-                                            return storedFileId != null && activeFileIdSet.contains(storedFileId.toString());
-                                        })
-                                        .map(m -> m.embedded().text())
-                                        .collect(Collectors.joining("\n\n"));
+            log.info(
+                    "[RAG_SEARCH] question=\"{}\", companyId={}, categoryId={}, rawMatches={}",
+                    question,
+                    companyId,
+                    categoryId,
+                    matches.size()
+            );
 
-                if (context.isBlank()) {
-                    return NO_RESULT;
-                }
+            // 로그가 너무 많아지지 않도록 상위 10개만 출력
+            int logCount = Math.min(matches.size(), 10);
+
+            for (int i = 0; i < logCount; i++) {
+
+                EmbeddingMatch<TextSegment> match = matches.get(i);
+
+                var metadata = match.embedded()
+                        .metadata()
+                        .toMap();
+
+                Object storedFileId = metadata.get("file_id");
+
+                String fileId = storedFileId == null
+                        ? null
+                        : storedFileId.toString();
+
+                boolean active = fileId != null
+                        && activeFileIdSet.contains(fileId);
+
+                String text = match.embedded().text();
+
+                String preview = text.length() > 200
+                        ? text.substring(0, 200)
+                        : text;
+
+                log.info(
+                        "[RAG_MATCH] rank={}, score={}, fileId={}, active={}, text=\"{}\"",
+                        i + 1,
+                        match.score(),
+                        fileId,
+                        active,
+                        preview.replace("\n", " ")
+                );
+            }
+
+            List<EmbeddingMatch<TextSegment>> activeMatches =
+                    matches.stream()
+                            .filter(m -> {
+
+                                Object storedFileId = m.embedded()
+                                        .metadata()
+                                        .toMap()
+                                        .get("file_id");
+
+                                return storedFileId != null
+                                        && activeFileIdSet.contains(
+                                        storedFileId.toString()
+                                );
+                            })
+                            .toList();
+
+            String context = activeMatches.stream()
+                    .map(m -> m.embedded().text())
+                    .collect(Collectors.joining("\n\n"));
+
+            long retrievalMs =
+                    System.currentTimeMillis() - retrievalStart;
+
+            log.info(
+                    "[RAG_RESULT] question=\"{}\", activeMatches={}, contextLength={}, retrievalMs={}",
+                    question,
+                    activeMatches.size(),
+                    context.length(),
+                    retrievalMs
+            );
+
+            if (context.isBlank()) {
+                return NO_RESULT;
+            }
 
 
             String prompt = String.format(
