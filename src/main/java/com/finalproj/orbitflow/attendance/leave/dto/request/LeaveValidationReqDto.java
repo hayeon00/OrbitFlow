@@ -1,4 +1,4 @@
-package com.finalproj.orbitflow.attendance.leave.dto;
+package com.finalproj.orbitflow.attendance.leave.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

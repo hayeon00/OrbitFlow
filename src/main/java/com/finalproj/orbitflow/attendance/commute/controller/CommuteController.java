@@ -114,16 +114,6 @@ public class CommuteController {
         );
     }
 
-    @PostMapping("/return")
-    public ResponseEntity<ResponseDto<Void>> returnFromOutsideOrTrip(@AuthenticationPrincipal SecurityUser user) {
-        commuteService.returnFromOutsideOrTrip(
-                user.getCompanyId(),
-                user.getEmployeeId()
-        );
-
-        return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, "자리복귀 및 정상출근 처리 완료", null));
-    }
-
 
 
 

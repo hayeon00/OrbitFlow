@@ -1,5 +1,10 @@
 package com.finalproj.orbitflow.global.time.calendar.enums;
 
+import com.finalproj.orbitflow.global.time.calendar.entity.CalendarDay;
+
+import java.time.LocalDate;
+import java.util.List;
+
 /**
  * Please explain the class!!!
  *
@@ -23,4 +28,8 @@ public enum CalendarDayType {
     public boolean isHoliday() {
         return this == PUBLIC_HOLIDAY || this == PAID_HOLIDAY;
     }
+
+
+
+
 }

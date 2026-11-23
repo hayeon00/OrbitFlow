@@ -101,7 +101,13 @@ class AttendanceDefaultRuleServiceIntegrationTest {
     private void update(LocalTime start, LocalTime end, Integer breakMinutes) {
         service.updateDefaultRule(
                 companyId,
-                new DefaultRuleUpdateReqDto(start, end, breakMinutes)
+                new DefaultRuleUpdateReqDto(
+                        start,
+                        end,
+                        breakMinutes,
+                        null,
+                        null
+                )
         );
     }
 

@@ -1,30 +1,29 @@
-package com.finalproj.orbitflow.attendance.leave.entity;
 
+package com.finalproj.orbitflow.attendance.leave.entity;
 
 import com.finalproj.orbitflow.global.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.math.BigDecimal; // DECIMAL(5, 2) 처리를 위해 사용
-
-/**
- * Please explain the class!!!
- *
- * @author : rlagkdus
- * @filename : LeaveBalance
- * @since : 2026. 1. 8. 목요일
- */
-
+import java.math.BigDecimal;
 
 @Entity
 @Getter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "leave_balance",
+@Table(
+        name = "leave_balance",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"company_id", "employee_id", "year"})
-        })
+                @UniqueConstraint(
+                        columnNames = {
+                                "company_id",
+                                "employee_id",
+                                "year"
+                        }
+                )
+        }
+)
 public class LeaveBalance extends BaseEntity {
 
     @Id
@@ -41,30 +40,74 @@ public class LeaveBalance extends BaseEntity {
     @Column(name = "year", nullable = false)
     private Integer year;
 
-    @Column(name = "total_granted", precision = 5, scale = 2)
+    @Column(
+            name = "total_granted",
+            nullable = false,
+            precision = 7,
+            scale = 2
+    )
     private BigDecimal totalGranted;
 
-    @Column(name = "remaining_days", precision = 5, scale = 2)
+    @Column(
+            name = "remaining_days",
+            nullable = false,
+            precision = 7,
+            scale = 2
+    )
     private BigDecimal remainingDays;
 
     public void updateBalance(BigDecimal days) {
-        if (this.totalGranted == null) this.totalGranted = BigDecimal.ZERO;
-        if (this.remainingDays == null) this.remainingDays = BigDecimal.ZERO;
+
+        if (this.totalGranted == null) {
+            this.totalGranted = BigDecimal.ZERO;
+        }
+
+        if (this.remainingDays == null) {
+            this.remainingDays = BigDecimal.ZERO;
+        }
 
         this.totalGranted = this.totalGranted.add(days);
         this.remainingDays = this.remainingDays.add(days);
     }
 
-    public void updateBalanceFromActualUsage(BigDecimal actualUsedDays) {
-        if (this.totalGranted == null) this.totalGranted = BigDecimal.ZERO;
-        this.remainingDays = this.totalGranted.subtract(actualUsedDays);
+    public void updateBalanceFromActualUsage(
+            BigDecimal actualUsedDays
+    ) {
+        if (this.totalGranted == null) {
+            this.totalGranted = BigDecimal.ZERO;
+        }
+
+        this.remainingDays =
+                this.totalGranted.subtract(actualUsedDays);
     }
 
     public void deductBalance(BigDecimal deductedDays) {
+
         if (this.remainingDays == null) {
             this.remainingDays = BigDecimal.ZERO;
         }
-        this.remainingDays = this.remainingDays.subtract(deductedDays);
+
+        this.remainingDays =
+                this.remainingDays.subtract(deductedDays);
     }
 
+    public void changeRemaining(BigDecimal delta) {
+
+        if (delta == null || remainingDays == null) {
+            throw new IllegalArgumentException(
+                    "잔여량 변경 값이 잘못되었습니다."
+            );
+        }
+
+        BigDecimal next = remainingDays.add(delta);
+
+        if (next.signum() < 0
+                || next.compareTo(totalGranted) > 0) {
+            throw new IllegalStateException(
+                    "연도별 잔여 연차 범위를 벗어났습니다."
+            );
+        }
+
+        remainingDays = next;
+    }
 }

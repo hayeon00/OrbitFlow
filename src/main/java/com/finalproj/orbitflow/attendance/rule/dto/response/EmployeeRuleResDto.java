@@ -1,3 +1,4 @@
+
 package com.finalproj.orbitflow.attendance.rule.dto.response;
 
 import com.finalproj.orbitflow.attendance.rule.entity.EmployeeRule;
@@ -5,14 +6,6 @@ import com.finalproj.orbitflow.attendance.rule.entity.EmployeeRule;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-
-/**
- * Please explain the class!!!
- *
- * @author : rlagkdus
- * @filename : EmployeeRuleResDto
- * @since : 2025. 12. 18. 목요일
- */
 
 public record EmployeeRuleResDto(
         Long overrideId,
@@ -25,9 +18,17 @@ public record EmployeeRuleResDto(
         String reason,
         LocalDate validFrom,
         LocalDate validTo,
-        LocalDateTime appliedAt
+        LocalDateTime appliedAt,
+
+        LocalTime breakStartTime,
+        LocalTime breakEndTime
 ) {
-    public EmployeeRuleResDto(EmployeeRule rule, String employeeName, String employeeNo) {
+
+    public EmployeeRuleResDto(
+            EmployeeRule rule,
+            String employeeName,
+            String employeeNo
+    ) {
         this(
                 rule.getId(),
                 rule.getEmployeeId(),
@@ -39,8 +40,9 @@ public record EmployeeRuleResDto(
                 rule.getReason(),
                 rule.getValidFrom(),
                 rule.getValidTo(),
-                rule.getAppliedAt()
+                rule.getAppliedAt(),
+                rule.getBreakStartTime(),
+                rule.getBreakEndTime()
         );
     }
-
 }

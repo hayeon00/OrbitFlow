@@ -84,14 +84,46 @@ class AttendanceRuleServiceTest {
         return LocalDate.of(2026, 10, day);
     }
 
-    private EmpAttRuleCreateReqDto createRequest(long employeeId, int from, int to) {
-        return new EmpAttRuleCreateReqDto(employeeId, LocalTime.of(9, 0),
-                LocalTime.of(18, 0), 60, "테스트", date(from), date(to));
+    private EmpAttRuleCreateReqDto createRequest(
+            long employeeId,
+            int from,
+            int to
+    ) {
+        LocalDate validFrom = date(from);
+        LocalDate validTo = date(to);
+
+        return new EmpAttRuleCreateReqDto(
+                employeeId,
+                LocalTime.of(9, 0),
+                LocalTime.of(18, 0),
+                60,
+                "테스트 사유",
+                validFrom,
+                validTo,
+                LocalTime.of(12, 0),
+                LocalTime.of(13, 0)
+        );
     }
 
-    private EmpAttRuleUpdateReqDto updateRequest(int from, int to, Boolean active) {
-        return new EmpAttRuleUpdateReqDto(LocalTime.of(10, 0),
-                LocalTime.of(19, 0), 60, "변경", date(from), date(to), active);
+    private EmpAttRuleUpdateReqDto updateRequest(
+            int from,
+            int to,
+            Boolean active
+    ) {
+        LocalDate validFrom = date(from);
+        LocalDate validTo = date(to);
+
+        return new EmpAttRuleUpdateReqDto(
+                LocalTime.of(10, 0),
+                LocalTime.of(18, 0),
+                60,
+                "테스트 사유",
+                validFrom,
+                validTo,
+                active,
+                LocalTime.of(12, 0),
+                LocalTime.of(13, 0)
+        );
     }
 
     private EmployeeRule existing(long employeeId, int from, int to) {

@@ -15,11 +15,7 @@ const WORK_STATUS_MAP = {
     'DEFAULT': { text: '출근전', className: 'badge-before-work' }
 };
 
-// 🚀 특수 상태 정의 (차단 및 '자리 복귀' 전환용)
-const SPECIAL_STATUSES = {
-    'BUSINESS_TRIP': '출장중',
-    'OUTWORK': '외근중'
-};
+
 
 const WORK_STATUS_STORAGE_KEY = 'optimisticWorkStatus';
 
@@ -118,38 +114,7 @@ function initWorkStatusBadgeInteractions() {
     });
 }
 
-/** 🚀 조기 복귀 처리 함수 (백엔드 LeaveService.processEarlyReturn 연동) */
-async function processEarlyReturn() {
-    try {
-        const response = await apiFetch('/api/leave/return', { method: 'POST' });
-        if (response.ok) {
-            clearOptimisticWorkStatus();
-            alert('업무로 복귀 처리되었습니다.');
 
-            // 서버 상태 즉시 동기화
-            await loadUserProfile();
-
-            // workStatusChanged 이벤트를 dispatch하여 commute.js에도 알림
-            const currentStatus = window.currentServerStatus;
-            if (currentStatus) {
-                window.dispatchEvent(new CustomEvent('workStatusChanged', {
-                    detail: { status: currentStatus }
-                }));
-            }
-
-            // commute.js의 버튼 상태도 업데이트되도록 이벤트 발생
-            if (typeof window.updateCommuteButtons === 'function') {
-                window.updateCommuteButtons();
-            }
-        } else {
-            const result = await response.json();
-            alert(result.message || '복귀 처리에 실패했습니다.');
-        }
-    } catch (error) {
-        console.error('복귀 API 호출 오류:', error);
-        alert('시스템 오류가 발생했습니다.');
-    }
-}
 
 /**
  * 3. 사용자 프로필 로드 (이름, 부서, 직급, 배지 포함)
@@ -229,71 +194,47 @@ async function loadUserProfile() {
 /**
  * 2. 이름 옆 근무 상태 배지 UI 업데이트
  */
+
 function updateNameAdjacentBadge(status) {
     const nameEl = document.getElementById('profileName');
     if (!nameEl) return;
 
-    const awayBtn = document.getElementById('awayBtn');
-    const checkInBtn = document.getElementById('checkInBtn');
-    const checkOutBtn = document.getElementById('checkOutBtn');
-
     let normalizedStatus = 'DEFAULT';
-    if (status && typeof status === 'string' && status.trim() !== '') {
+
+    if (
+        status &&
+        typeof status === 'string' &&
+        status.trim() !== ''
+    ) {
         normalizedStatus = status.toUpperCase();
     }
 
     let badge = document.getElementById('workStatusBadge');
+
     if (!badge) {
         badge = document.createElement('span');
         badge.id = 'workStatusBadge';
-        nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
+
+        nameEl.parentNode.insertBefore(
+            badge,
+            nameEl.nextSibling
+        );
     }
 
-    const config = WORK_STATUS_MAP[normalizedStatus] || WORK_STATUS_MAP['DEFAULT'];
+    const config =
+        WORK_STATUS_MAP[normalizedStatus] ||
+        WORK_STATUS_MAP['DEFAULT'];
+
     badge.textContent = config.text;
-    badge.className = `work-status-badge ${config.className}`;
+    badge.className =
+        `work-status-badge ${config.className}`;
+
     badge.style.display = 'inline-block';
     badge.style.marginLeft = '8px';
 
-    // ✅ 버튼 잠금/해제 유틸
-    const setLocked = (locked) => {
-        [checkInBtn, awayBtn, checkOutBtn].forEach(btn => {
-            if (!btn) return;
-            btn.toggleAttribute('disabled', locked);
-            btn.classList.toggle('is-locked', locked);
-            // <a> 태그 등 disabled가 안 먹는 경우 대비
-            btn.style.pointerEvents = locked ? 'none' : '';
-        });
-    };
-
-    // 1) 휴가중이면: 자리비움 텍스트 유지 + 버튼 전체 비활성화
-    if (normalizedStatus === 'VACATION') {
-        setLocked(true);
-
-        if (awayBtn) {
-            const btnText = awayBtn.querySelector('span');
-            if (btnText) btnText.textContent = '자리비움';  // ✅ 그대로
-            awayBtn.classList.remove('btn-return');          // ✅ 복귀 스타일 제거
-        }
-        return;
-    }
-
-    // 2) 휴가가 아니면: 버튼 잠금 해제
-    setLocked(false);
-
-    // 3) 외근/출장일 때만 '자리 복귀'로 전환
-    if (awayBtn) {
-        const btnText = awayBtn.querySelector('span');
-
-        if (SPECIAL_STATUSES[normalizedStatus]) { // BUSINESS_TRIP / OUTWORK만 남겨둔 상태
-            if (btnText) btnText.textContent = '자리 복귀';
-            awayBtn.classList.add('btn-return');
-        } else {
-            if (btnText) btnText.textContent = '자리비움';
-            awayBtn.classList.remove('btn-return');
-        }
-    }
+    // 버튼 활성화/비활성화는 commute.js에서만 관리
 }
+
 
 
 

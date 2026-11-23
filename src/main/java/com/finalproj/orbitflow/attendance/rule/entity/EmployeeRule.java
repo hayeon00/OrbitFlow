@@ -50,6 +50,13 @@ public class EmployeeRule {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "break_start_time")
+    private LocalTime breakStartTime;
+
+    @Column(name = "break_end_time")
+    private LocalTime breakEndTime;
+
+
     public static EmployeeRule create(
             Long companyId,
             Long employeeId,
@@ -103,6 +110,44 @@ public class EmployeeRule {
         }
 
         this.appliedAt = LocalDateTime.now();
+    }
+
+    public void updateLunchBreak(
+            LocalTime breakStartTime,
+            LocalTime breakEndTime
+    ) {
+        if (breakStartTime == null && breakEndTime == null) {
+            this.breakStartTime = null;
+            this.breakEndTime = null;
+            return;
+        }
+
+        if (breakStartTime == null || breakEndTime == null) {
+            throw new IllegalArgumentException(
+                    "휴게 시작·종료시간을 모두 입력해야 합니다."
+            );
+        }
+
+        if (!breakStartTime.isBefore(breakEndTime)) {
+            throw new IllegalArgumentException(
+                    "휴게 종료시간은 시작시간보다 늦어야 합니다."
+            );
+        }
+
+        if (breakStartTime.isBefore(startTime)
+                || breakEndTime.isAfter(endTime)) {
+            throw new IllegalArgumentException(
+                    "휴게시간은 사원 근무시간 안에 있어야 합니다."
+            );
+        }
+
+        this.breakStartTime = breakStartTime;
+        this.breakEndTime = breakEndTime;
+        this.breakMinutes = (int)
+                java.time.Duration.between(
+                        breakStartTime,
+                        breakEndTime
+                ).toMinutes();
     }
 
     public void delete() {

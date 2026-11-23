@@ -75,7 +75,8 @@ langchain4j:
     model: gpt-4o-mini
 
 file:
-  upload-dir:
+  local:
+    root-path: ./uploads
 
 cloud:
   aws:
@@ -100,4 +101,11 @@ chroma:
   host: localhost
   port: 8000
   collection: orbitflow_manuals
+
+
+orbitflow:
+  leave:
+    review-credit-types: ""
+    accrual-enabled: true
+    regular-accrual-enabled: true
 

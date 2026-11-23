@@ -1,15 +1,15 @@
 package com.finalproj.orbitflow.attendance.leave.controller;
 
 import com.finalproj.orbitflow.approval.document.enums.DocumentStatus;
-import com.finalproj.orbitflow.attendance.leave.dto.*;
+import com.finalproj.orbitflow.attendance.leave.dto.request.LeaveSearchReqDto;
+import com.finalproj.orbitflow.attendance.leave.dto.request.LeaveValidationReqDto;
+import com.finalproj.orbitflow.attendance.leave.dto.response.*;
 import com.finalproj.orbitflow.attendance.leave.service.AttendanceValidService;
 import com.finalproj.orbitflow.attendance.leave.service.LeaveService;
 import com.finalproj.orbitflow.attendance.leave.service.LeaveTypeService;
 import com.finalproj.orbitflow.global.common.ResponseDto;
 import com.finalproj.orbitflow.global.security.SecurityUser;
 import com.finalproj.orbitflow.global.security.SecurityUtils;
-import com.finalproj.orbitflow.hr.employee.entity.Employee;
-import com.finalproj.orbitflow.hr.employee.enums.WorkStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -48,15 +48,7 @@ public class LeaveController {
         return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, year + "년도 연차 부여 완료", null));
     }
 
-    @PostMapping("/admin/leave/expire-process")
-    public ResponseEntity<?> manualExpireProcess() {
-        leaveService.expireOutdatedLeaves();
 
-        return ResponseEntity.ok(new ResponseDto<>(
-                HttpStatus.OK,
-                "연차 소멸 프로세스가 성공적으로 실행되었습니다.",
-                null));
-    }
 
     @GetMapping("/leave/summary")
     public ResponseEntity<ResponseDto<LeaveBalanceResDto>> getMySummary(
@@ -118,16 +110,6 @@ public class LeaveController {
     ) {
         LeaveValidationResDto result = attendanceValidService.validateLeave(SecurityUtils.getEmployeeId(), reqDto);
         return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, "연차 사용 검증 결과 반환", result));
-    }
-
-    @PostMapping("/grant-initial")
-    public ResponseEntity<?> grantInitialLeave(@RequestParam Long employeeId) {
-
-        Employee employee = leaveService.getEmployeeById(employeeId);
-
-        leaveService.grantInitialLeave(employee);
-
-        return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, "신입사원 비례 연차 부여가 완료되었습니다.", null));
     }
 
 

@@ -1,36 +1,23 @@
+
 package com.finalproj.orbitflow.approval.document.event;
 
 import com.finalproj.orbitflow.approval.document.service.application.ApprovalEventTxService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 결재 완료 이후 휴가 관련 후처리를 담당하는 이벤트 핸들러.
- * <p>
- * 결재 트랜잭션이 정상적으로 커밋된 이후에만 실행되며,
- * 승인된 문서를 기준으로 휴가 반영 로직을 비동기 방식으로 처리한다.
- * <p>
- * 실제 휴가 처리 로직은 ApprovalEventTxService에 위임하고,
- * 이 클래스는 트랜잭션 이벤트를 받아 실행을 연결하는 역할만 수행한다.
+ * 휴가 승인 처리는
+ * DocumentApprovalApplicationService의
+ * 최종 승인 트랜잭션에서 직접 실행한다.
  *
- * @author : Choi MinHyeok
- * @filename : VacationApprovalHandler
- * @since : 25. 12. 31. 수요일
+ * 기존 비동기 이벤트 리스너는 사용하지 않는다.
  */
-
-
 @Component
 @RequiredArgsConstructor
 public class VacationApprovalHandler {
 
     private final ApprovalEventTxService approvalEventTxService;
 
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handle(Long documentId) {
-        approvalEventTxService.processVacationApproval(documentId);
-    }
+    // 기존 @Async + AFTER_COMMIT 휴가 처리 제거.
+    // 중복 차감 방지를 위해 이벤트를 구독하지 않는다.
 }

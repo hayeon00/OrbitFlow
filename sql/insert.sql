@@ -2094,22 +2094,20 @@ VALUES ('ATTENDANCE', '근태'),
 
 
 
-INSERT INTO leave_type (type_name, is_countable, description, unit_days, created_at, updated_at)
+INSERT INTO leave_type
+(type_name, is_countable, attendance_policy, description, unit_days, created_at, updated_at)
 VALUES
-
--- [차감 항목]
-('연차', 1, '근로기준법에 따른 정기 유급휴가 (1일 단위)', 1.000, NOW(), NOW()),
-('오전반차', 1, '오전 근무 후 14시 퇴근 (0.5일 차감)', 0.500, NOW(), NOW()),
-('오후반차', 1, '14시 출근 후 오후 근무 (0.5일 차감)', 0.500, NOW(), NOW()),
-('반반차', 1, '2시간 단위 유급휴가 (0.25일 차감)', 0.250, NOW(), NOW()),
-('보상휴가', 1, '연장근로 보상으로 발생한 대체 휴가 (1일 단위)', 1.000, NOW(), NOW()),
-
--- [비차감 항목]
-('경조휴가', 0, '본인 및 가족 경조사 관련 유급휴가', 0.000, NOW(), NOW()),
-('병가', 0, '업무 외 질병/부상 치료를 위한 휴가', 0.000, NOW(), NOW()),
-('포상휴가', 0, '우수 성과자 등에게 부여되는 특별 유급휴가', 0.000, NOW(), NOW()),
-('공가', 0, '예비군, 투표 등 공적 의무 수행을 위한 휴가', 0.000, NOW(), NOW()),
-('가족돌봄휴가', 0, '가족의 질병, 사고, 양육을 위한 긴급 휴가 (무급 원칙)', 0.000, NOW(), NOW());
+    ('연차',       1, 'ATTENDANCE_CREDIT', '근로기준법에 따른 정기 유급휴가 (1일 단위)', 1.000, NOW(), NOW()),
+    ('오전반차',   1, 'PARTIAL_DAY',      '오전 휴가 후 14시 출근 (0.5일 차감)', 0.500, NOW(), NOW()),
+    ('오후반차',   1, 'PARTIAL_DAY',      '오전 근무 후 14시 퇴근 (0.5일 차감)', 0.500, NOW(), NOW()),
+    ('반반차',     1, 'PARTIAL_DAY',      '2시간 단위 유급휴가 (0.25일 차감)', 0.250, NOW(), NOW()),
+    ('보상휴가',   0, 'REVIEW_REQUIRED',  '연장근로 보상으로 발생한 대체 휴가 (연차 잔여량 미차감)', 1.000, NOW(), NOW()),
+    ('경조휴가',   0, 'REVIEW_REQUIRED',  '본인 및 가족 경조사 관련 유급휴가', 0.000, NOW(), NOW()),
+    ('병가',       0, 'REVIEW_REQUIRED',  '업무 외 질병/부상 치료를 위한 휴가', 0.000, NOW(), NOW()),
+    ('포상휴가',   0, 'REVIEW_REQUIRED',  '우수 성과자 등에게 부여되는 특별 유급휴가', 0.000, NOW(), NOW()),
+    ('공가',       0, 'REVIEW_REQUIRED',  '예비군, 투표 등 공적 의무 수행을 위한 휴가', 0.000, NOW(), NOW()),
+    ('하계휴가',   0, 'REVIEW_REQUIRED',  '회사가 별도로 부여하는 여름 휴가 (연차 미차감)', 0.000, NOW(), NOW()),
+    ('가족돌봄휴가',0, 'REVIEW_REQUIRED', '가족의 질병, 사고, 양육을 위한 긴급 휴가 (무급 원칙)', 0.000, NOW(), NOW());
 
 
 
@@ -2118,12 +2116,21 @@ VALUES
 -- 재실행해도 기존 관리자가 수정한 출퇴근/휴게 시간을 덮어쓰지 않는다.
 INSERT INTO attendance_rule
 (company_id, name, default_start_time, default_end_time,
- default_break_minutes, late_threshold_min, is_default)
+ default_break_minutes, break_start_time, break_end_time, late_threshold_min, is_default)
 VALUES
-    (@c1, 'OrbitFlow 기본 근무규칙', '09:00:00', '18:00:00', 60, 10, TRUE),
-    (@c2, 'TechSolution 기본 근무규칙', '09:00:00', '18:00:00', 60, 10, TRUE),
-    (@c3, 'GlobalService 기본 근무규칙', '09:00:00', '18:00:00', 60, 10, TRUE)
+    (@c1, 'OrbitFlow 기본 근무규칙', '09:00:00', '18:00:00', 60, '12:00:00', '13:00:00', 10, TRUE),
+    (@c2, 'TechSolution 기본 근무규칙', '09:00:00', '18:00:00', 60, '12:00:00', '13:00:00', 10, TRUE),
+    (@c3, 'GlobalService 기본 근무규칙', '09:00:00', '18:00:00', 60, '12:00:00', '13:00:00', 10, TRUE)
 ON DUPLICATE KEY UPDATE company_id = company_id;
+
+-- 회사별 오전/오후 반차 기준 시간.
+-- 기존 관리자 설정을 덮어쓰지 않도록 INSERT IGNORE로 초기 값만 생성.
+INSERT IGNORE INTO leave_time_policy
+(company_id, morning_half_return_time, afternoon_half_leave_time)
+VALUES
+    (@c1, '14:00:00', '14:00:00'),
+    (@c2, '14:00:00', '14:00:00'),
+    (@c3, '14:00:00', '14:00:00');
 
 -- 근태 이력의 applied_rule_id를 고정값 1이 아닌 실제 규칙 ID로 연결한다.
 SET @c1_attendance_rule_id := (
@@ -2134,18 +2141,20 @@ SET @c1_attendance_rule_id := (
 
 -- =========================================================
 -- 2) 2025 사용 기록 20건 (차감/비차감 섞어서)
---    - status=APPROVED만 leave_balance 차감 반영되게 만들었음
+--    - APPROVED인 법정 연차 유형만 leave_usage_allocation 차감 이력 생성
 -- =========================================================
 
 START TRANSACTION;
 
-SET @COMPANY_ID := 1;
-SET @EMPLOYEE_ID := 1;
+SET @COMPANY_ID := @c1;
+SET @EMPLOYEE_ID := (SELECT id FROM employee WHERE company_id = @c1 AND employee_no = 'OF-001' LIMIT 1);
+
+SET @EMPLOYEE_2_ID := (SELECT id FROM employee WHERE company_id = @c1 AND employee_no = 'OF-010' LIMIT 1);
 
 INSERT INTO attendance_record
 (employee_id, company_id, start_date, end_date, days, type_id, reason, status, created_at, updated_at)
 VALUES
--- [차감] 연차(1) / 반차(2,3) / 반반차(4) / 보상휴가(5)
+-- [법정 연차 차감] 연차(1) / 반차(2,3) / 반반차(4); 보상휴가(5)는 별도
 (@EMPLOYEE_ID, @COMPANY_ID, '2025-01-15', '2025-01-15', 1.0 , 1, '연초 개인정비', 'APPROVED', '2025-01-10 09:00:00', NOW()),
 (@EMPLOYEE_ID, @COMPANY_ID, '2025-02-14', '2025-02-14', 0.5 , 2, '은행업무(오전)', 'APPROVED', '2025-02-10 10:00:00', NOW()),
 (@EMPLOYEE_ID, @COMPANY_ID, '2025-03-07', '2025-03-07', 0.5 , 3, '개인용무(오후)', 'REJECTED', '2025-03-05 11:00:00', NOW()),
@@ -2175,27 +2184,27 @@ VALUES
 (@EMPLOYEE_ID, @COMPANY_ID, '2026-04-10', '2026-04-10', 0.25, 4, '2026-04 반반차', 'APPROVED', NOW(), NOW()),
 (@EMPLOYEE_ID, @COMPANY_ID, '2026-06-19', '2026-06-19', 1.0 , 1, '2026-06 연차', 'APPROVED', NOW(), NOW()),
 
-(2,1,'2026-01-08','2026-01-08',1.0,1,'EMP2-2026-01 연차','APPROVED',NOW(),NOW()),
-(2,1,'2026-01-22','2026-01-22',0.5,2,'EMP2-2026-02 오전반차','APPROVED',NOW(),NOW()),
-(2,1,'2026-02-12','2026-02-12',0.5,3,'EMP2-2026-03 오후반차','APPROVED',NOW(),NOW()),
-(2,1,'2026-02-26','2026-02-26',0.25,4,'EMP2-2026-04 반반차','APPROVED',NOW(),NOW()),
-(2,1,'2026-03-12','2026-03-12',1.0,1,'EMP2-2026-05 연차','APPROVED',NOW(),NOW()),
-(2,1,'2026-03-26','2026-03-26',1.0,1,'EMP2-2026-06 연차','APPROVED',NOW(),NOW()),
-(2,1,'2026-04-09','2026-04-09',0.5,2,'EMP2-2026-07 오전반차','APPROVED',NOW(),NOW()),
-(2,1,'2026-04-23','2026-04-23',0.5,3,'EMP2-2026-08 오후반차','APPROVED',NOW(),NOW()),
-(2,1,'2026-05-07','2026-05-07',1.0,5,'EMP2-2026-09 보상휴가','APPROVED',NOW(),NOW()),
-(2,1,'2026-06-11','2026-06-11',1.0,1,'EMP2-2026-10 연차','APPROVED',NOW(),NOW()),
-(2,1,'2026-09-24','2026-09-24',1.0,1,'EMP2-2026-11 연차','APPROVED',NOW(),NOW()),
-(2,1,'2026-12-23','2026-12-23',1.0,1,'EMP2-2026-12 연차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-01-08','2026-01-08',1.0,1,'EMP2-2026-01 연차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-01-22','2026-01-22',0.5,2,'EMP2-2026-02 오전반차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-02-12','2026-02-12',0.5,3,'EMP2-2026-03 오후반차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-02-26','2026-02-26',0.25,4,'EMP2-2026-04 반반차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-03-12','2026-03-12',1.0,1,'EMP2-2026-05 연차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-03-26','2026-03-26',1.0,1,'EMP2-2026-06 연차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-04-09','2026-04-09',0.5,2,'EMP2-2026-07 오전반차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-04-23','2026-04-23',0.5,3,'EMP2-2026-08 오후반차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-05-07','2026-05-07',1.0,5,'EMP2-2026-09 보상휴가','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-06-11','2026-06-11',1.0,1,'EMP2-2026-10 연차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-09-24','2026-09-24',1.0,1,'EMP2-2026-11 연차','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-12-23','2026-12-23',1.0,1,'EMP2-2026-12 연차','APPROVED',NOW(),NOW()),
 
-(2,1,'2026-01-20','2026-01-20',1.0,9 ,'EMP2-2026-13 공가','APPROVED',NOW(),NOW()),
-(2,1,'2026-02-03','2026-02-03',1.0,7 ,'EMP2-2026-14 병가','APPROVED',NOW(),NOW()),
-(2,1,'2026-03-16','2026-03-18',3.0,6 ,'EMP2-2026-15 경조','APPROVED',NOW(),NOW()),
-(2,1,'2026-05-01','2026-05-01',1.0,8 ,'EMP2-2026-16 포상','APPROVED',NOW(),NOW()),
-(2,1,'2026-06-14','2026-06-14',1.0,9 ,'EMP2-2026-17 공가','APPROVED',NOW(),NOW()),
-(2,1,'2026-07-27','2026-07-31',5.0,10,'EMP2-2026-18 하계','APPROVED',NOW(),NOW()),
-(2,1,'2026-11-06','2026-11-08',3.0,6 ,'EMP2-2026-19 경조','APPROVED',NOW(),NOW()),
-(2,1,'2026-12-28','2026-12-28',1.0,11,'EMP2-2026-20 가족돌봄','APPROVED',NOW(),NOW());
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-01-20','2026-01-20',1.0,9 ,'EMP2-2026-13 공가','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-02-03','2026-02-03',1.0,7 ,'EMP2-2026-14 병가','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-03-16','2026-03-18',3.0,6 ,'EMP2-2026-15 경조','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-05-01','2026-05-01',1.0,8 ,'EMP2-2026-16 포상','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-06-14','2026-06-14',1.0,9 ,'EMP2-2026-17 공가','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-07-27','2026-07-31',5.0,10,'EMP2-2026-18 하계','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-11-06','2026-11-08',3.0,6 ,'EMP2-2026-19 경조','APPROVED',NOW(),NOW()),
+(@EMPLOYEE_2_ID,@COMPANY_ID,'2026-12-28','2026-12-28',1.0,11,'EMP2-2026-20 가족돌봄','APPROVED',NOW(),NOW());
 
 
 COMMIT;
@@ -2203,104 +2212,111 @@ COMMIT;
 
 START TRANSACTION;
 
-SET @COMPANY_ID := 1;
-SET @EMPLOYEE_ID := 1;
+SET @COMPANY_ID := @c1;
+SET @EMPLOYEE_ID := (SELECT id FROM employee WHERE company_id = @c1 AND employee_no = 'OF-001' LIMIT 1);
 
--- 2025 부여
-INSERT INTO grant_history (employee_id, company_id, grant_date, granted_days, grant_type, created_at)
+-- =========================================================
+-- 연차 데모 원장: 입사일 기준 정기 연차(2025~2026)
+-- 주의: 테스트용으로 각 대상 연도의 법정 출근율 80% 충족을 가정함.
+-- 실제 연차 발생은 Java 근태 판정/배치에서 수행해야 함.
+-- 미래 발생일, 입사 1년 미만은 이 시드에서 지급하지 않음.
+-- =========================================================
+INSERT INTO grant_history
+(employee_id, company_id, grant_date, granted_days, remaining_days,
+ grant_type, expiration_date, is_expired, created_at)
 SELECT
-    e.id,
-    e.company_id,
-    DATE('2025-01-01') AS grant_date,
-    CASE
-        WHEN e.hire_date <= DATE_SUB(DATE('2025-01-01'), INTERVAL 1 YEAR) THEN
-            LEAST(15 + FLOOR((TIMESTAMPDIFF(YEAR, e.hire_date, DATE('2025-01-01')) - 1) / 2), 25)
-        ELSE
-            ROUND((TIMESTAMPDIFF(MONTH, e.hire_date, DATE('2025-01-01')) / 12) * 15, 2)
-        END AS granted_days,
-    CASE
-        WHEN e.hire_date <= DATE_SUB(DATE('2025-01-01'), INTERVAL 1 YEAR) THEN 'ANNUAL_REGULAR'
-        ELSE 'ANNUAL_PROPORTIONAL'
-        END AS grant_type,
-    NOW()
-FROM employee e
-WHERE e.id = @EMPLOYEE_ID
-  AND e.company_id = @COMPANY_ID
-  AND e.hire_date <= DATE('2025-01-01')
-  AND NOT EXISTS (
-    SELECT 1 FROM grant_history gh
-    WHERE gh.employee_id = e.id
-      AND gh.company_id = e.company_id
-      AND gh.grant_date = DATE('2025-01-01')
-);
-
--- 2026 부여
-INSERT INTO grant_history (employee_id, company_id, grant_date, granted_days, grant_type, created_at)
-SELECT
-    e.id,
-    e.company_id,
-    DATE('2026-01-01') AS grant_date,
-    CASE
-        WHEN e.hire_date <= DATE_SUB(DATE('2026-01-01'), INTERVAL 1 YEAR) THEN
-            LEAST(15 + FLOOR((TIMESTAMPDIFF(YEAR, e.hire_date, DATE('2026-01-01')) - 1) / 2), 25)
-        ELSE
-            ROUND((TIMESTAMPDIFF(MONTH, e.hire_date, DATE('2026-01-01')) / 12) * 15, 2)
-        END AS granted_days,
-    CASE
-        WHEN e.hire_date <= DATE_SUB(DATE('2026-01-01'), INTERVAL 1 YEAR) THEN 'ANNUAL_REGULAR'
-        ELSE 'ANNUAL_PROPORTIONAL'
-        END AS grant_type,
-    NOW()
-FROM employee e
-WHERE e.id = @EMPLOYEE_ID
-  AND e.company_id = @COMPANY_ID
-  AND e.hire_date <= DATE('2026-01-01')
-  AND NOT EXISTS (
-    SELECT 1 FROM grant_history gh
-    WHERE gh.employee_id = e.id
-      AND gh.company_id = e.company_id
-      AND gh.grant_date = DATE('2026-01-01')
-);
-
-COMMIT;
-
-
-START TRANSACTION;
-
-SET @COMPANY_ID := 1;
-SET @EMPLOYEE_ID := 1;
-
--- 2025/2026 각각 total_granted / remaining 계산해서 UPSERT
-INSERT INTO leave_balance (company_id, employee_id, year, total_granted, remaining_days)
-SELECT
-    @COMPANY_ID,
-    @EMPLOYEE_ID,
-    y.year,
-    IFNULL(g.total_granted, 0) AS total_granted,
-    ROUND(IFNULL(g.total_granted, 0) - IFNULL(u.used_days, 0), 2) AS remaining_days
+    x.employee_id, x.company_id, x.grant_date,
+    x.granted_days, x.granted_days,
+    'ANNUAL_REGULAR',
+    DATE_SUB(DATE_ADD(x.grant_date, INTERVAL 1 YEAR), INTERVAL 1 DAY),
+    FALSE, NOW()
 FROM (
-         SELECT 2025 AS year UNION ALL SELECT 2026
-     ) y
-         LEFT JOIN (
-    SELECT YEAR(grant_date) AS year, SUM(granted_days) AS total_granted
-    FROM grant_history
-    WHERE company_id=@COMPANY_ID AND employee_id=@EMPLOYEE_ID
-      AND YEAR(grant_date) IN (2025, 2026)
-    GROUP BY YEAR(grant_date)
-) g ON g.year = y.year
-         LEFT JOIN (
-    SELECT YEAR(ar.start_date) AS year, SUM(ar.days) AS used_days
-    FROM attendance_record ar
-             JOIN leave_type lt ON lt.id = ar.type_id
-    WHERE ar.company_id=@COMPANY_ID AND ar.employee_id=@EMPLOYEE_ID
-      AND ar.status='APPROVED'
-      AND YEAR(ar.start_date) IN (2025, 2026)
-      AND lt.is_countable=1
-    GROUP BY YEAR(ar.start_date)
-) u ON u.year = y.year
+         SELECT
+             e.id AS employee_id,
+             e.company_id,
+             DATE_ADD(e.hire_date, INTERVAL (y.yr - YEAR(e.hire_date)) YEAR) AS grant_date,
+             LEAST(
+                     15 + FLOOR(
+                             (TIMESTAMPDIFF(YEAR, e.hire_date,
+                                            DATE_ADD(e.hire_date, INTERVAL (y.yr - YEAR(e.hire_date)) YEAR)) - 1) / 2
+                          ), 25
+             ) AS granted_days
+         FROM employee e
+                  CROSS JOIN (
+             SELECT 2025 AS yr UNION ALL SELECT 2026
+         ) y
+         WHERE e.status = 'ACTIVE'
+           AND e.role <> 'TEAM_ORBIT'
+           AND DATE_ADD(e.hire_date, INTERVAL (y.yr - YEAR(e.hire_date)) YEAR)
+             >= DATE_ADD(e.hire_date, INTERVAL 1 YEAR)
+           AND DATE_ADD(e.hire_date, INTERVAL (y.yr - YEAR(e.hire_date)) YEAR)
+             <= LEAST(CURDATE(), DATE('2026-12-31'))
+     ) x
+ON DUPLICATE KEY UPDATE is_expired = is_expired;
+
+-- 승인된 법정 연차/반차/반반차만 법정 연차 원장에 배분한다.
+-- 보상휴가 등 별도 휴가는 연차 원장에서 차감하지 않는다.
+-- 단일 승인 기록의 최대 1일은 여기서 생성한 정기 발생분으로 충당 가능하다고 가정.
+INSERT INTO leave_usage_allocation
+(company_id, employee_id, attendance_record_id, grant_history_id,
+ allocated_days, released_days, created_at, updated_at)
+SELECT ar.company_id, ar.employee_id, ar.id, g.id,
+       ar.days, 0.00, NOW(), NOW()
+FROM attendance_record ar
+         JOIN leave_type lt ON lt.id = ar.type_id
+         JOIN grant_history g ON g.id = (
+    SELECT g2.id
+    FROM grant_history g2
+    WHERE g2.employee_id = ar.employee_id
+      AND g2.company_id = ar.company_id
+      AND g2.grant_date <= ar.start_date
+      AND g2.expiration_date >= ar.start_date
+    ORDER BY g2.expiration_date ASC, g2.grant_date ASC, g2.id ASC
+    LIMIT 1
+)
+WHERE ar.status = 'APPROVED'
+  AND lt.type_name IN ('연차', '오전반차', '오후반차', '반반차')
+  AND ar.employee_id IS NOT NULL
+ON DUPLICATE KEY UPDATE released_days = released_days;
+
+-- 부여 건별 사용량 반영 (기존 차감량 계산 방식 제거)
+UPDATE grant_history gh
+    LEFT JOIN (
+        SELECT grant_history_id,
+               SUM(allocated_days - released_days) AS used_days
+        FROM leave_usage_allocation
+        GROUP BY grant_history_id
+    ) ua ON ua.grant_history_id = gh.id
+SET gh.remaining_days = GREATEST(
+        gh.granted_days - COALESCE(ua.used_days, 0.00), 0.00
+                        );
+
+-- 오늘 기준 만료된 연차는 사용 이력을 보존하고 잔여량만 0으로 처리
+UPDATE grant_history
+SET remaining_days = 0.00,
+    is_expired = TRUE
+WHERE expiration_date < CURDATE()
+  AND is_expired = FALSE;
+
+-- 발생 연도별 집계: grant_history와 일관되게 갱신
+INSERT INTO leave_balance
+(company_id, employee_id, year, total_granted, remaining_days)
+SELECT gh.company_id,
+       gh.employee_id,
+       YEAR(gh.grant_date),
+       SUM(gh.granted_days),
+       SUM(gh.remaining_days)
+FROM grant_history gh
+GROUP BY gh.company_id, gh.employee_id, YEAR(gh.grant_date)
 ON DUPLICATE KEY UPDATE
                      total_granted = VALUES(total_granted),
                      remaining_days = VALUES(remaining_days);
+
+-- 승인 날짜가 NULL이면 승인 기록 표시가 혼동될 수 있어 시드 데이터에만 채움
+UPDATE attendance_record
+SET approved_at = created_at
+WHERE status = 'APPROVED'
+  AND approved_at IS NULL;
 
 COMMIT;
 

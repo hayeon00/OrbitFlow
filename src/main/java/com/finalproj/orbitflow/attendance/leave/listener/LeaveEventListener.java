@@ -41,10 +41,6 @@ public class LeaveEventListener {
             return;
         }
 
-        try {
-            leaveService.grantInitialLeave(emp);
-        } catch (Exception e) {
-            log.error("[LeaveEvent] 초기 연차 부여 실패 - employeeId={}", emp.getId(), e);
-        }
+
     }
 }

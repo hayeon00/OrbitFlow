@@ -14,6 +14,7 @@ import com.finalproj.orbitflow.approval.document.service.domain.WorkingDayServic
 import com.finalproj.orbitflow.approval.document.content.entity.DocumentContent;
 import com.finalproj.orbitflow.approval.document.content.repository.DocumentContentRepository;
 import com.finalproj.orbitflow.approval.form.template.group.enums.BaseRole;
+import com.finalproj.orbitflow.attendance.leave.enums.LeaveAttendancePolicy;
 import com.finalproj.orbitflow.attendance.leave.service.LeaveService;
 import com.finalproj.orbitflow.attendance.rule.entity.AttendanceRule;
 import com.finalproj.orbitflow.attendance.rule.repository.AttendanceRuleRepository;
@@ -171,8 +172,18 @@ public class ApprovalEventTxService {
         );
 
         LocalDate today = LocalDate.now();
-        if (dates.contains(today)) {
-            leaveService.updateWorkStatus(writer.getId(), WorkStatus.VACATION);
+
+        boolean isPartialDay =
+                result.leaveType().getAttendancePolicy()
+                        == LeaveAttendancePolicy.PARTIAL_DAY;
+
+        if (dates.contains(today) && !isPartialDay) {
+
+            leaveService.updateWorkStatus(
+                    writer.getId(),
+                    WorkStatus.VACATION
+            );
+
             log.info(
                     "[StatusUpdate] Vacation approved - employeeId={}, name={}",
                     writer.getId(),

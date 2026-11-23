@@ -1,15 +1,16 @@
 package com.finalproj.orbitflow.attendance.rule.controller;
 
+import com.finalproj.orbitflow.attendance.leave.service.LeaveTimePolicyService;
 import com.finalproj.orbitflow.attendance.rule.dto.request.DefaultRuleUpdateReqDto;
 import com.finalproj.orbitflow.attendance.rule.service.AttendanceRuleService;
 import com.finalproj.orbitflow.global.exception.GlobalExceptionHandler;
 import com.finalproj.orbitflow.global.exception.InvalidRequestException;
 
 import com.finalproj.orbitflow.global.security.SecurityUser;
-import com.finalproj.orbitflow.hr.company.service.CompanyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,12 +33,18 @@ class AttendanceRuleControllerTest {
     private MockMvc mockMvc;
     private AttendanceRuleService attendanceRuleService;
 
+    @Mock
+    private LeaveTimePolicyService leaveTimePolicyService;
+
     @BeforeEach
     void setUp() {
         attendanceRuleService = mock(AttendanceRuleService.class);
 
         AttendanceRuleController controller =
-                new AttendanceRuleController(attendanceRuleService);
+                new AttendanceRuleController(
+                        attendanceRuleService,
+                        leaveTimePolicyService
+                );
 
         SecurityUser admin = mock(SecurityUser.class);
         when(admin.getCompanyId()).thenReturn(1L);

@@ -6,7 +6,10 @@
     document.addEventListener('DOMContentLoaded', function() {
         updateClock();
         setInterval(updateClock, 1000);
+
         updateWorkStatusBadge();
+        updateButtonStates();
+
         loadActiveWorkHours();
         loadTodayAttendance();
         setupEventListeners();
@@ -235,43 +238,7 @@
         }
     }
 
-    async function handleReturnFromOutsideOrTrip() {
-        const token = getAuthToken();
-        if (!token) {
-            sweetError("로그인 정보가 없습니다.");
-            return;
-        }
 
-        const resultConfirm = await sweetConfirm('복귀 안내', '업무로 복귀하시겠습니까?');
-        if (!resultConfirm.isConfirmed) return;
-
-        try {
-            const response = await fetch('/api/attendance/return', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-            });
-
-            // 응답 바디가 없을 수도 있으니 안전 처리
-            let result = null;
-            try { result = await response.json(); } catch (e) {}
-
-            if (!response.ok) {
-                const msg = (result && (result.message || (result.data && result.data.message))) || '복귀 처리에 실패했습니다.';
-                sweetError(msg);
-                return;
-            }
-
-            await sweetSuccess('자리복귀 및 정상출근 처리 완료');
-
-            await loadTodayAttendance();
-            if (window.location.pathname === '/' || window.location.pathname === '/view/main') {
-                if (typeof loadDashboardData === 'function') loadDashboardData();
-            }
-        } catch (error) {
-            console.error(error);
-            sweetError('시스템 오류가 발생했습니다.');
-        }
-    }
 
     function formatTime(isoString) {
         if (!isoString) return '미기록';
@@ -279,55 +246,80 @@
         return date.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
     }
 
+
     function updateButtonStates() {
         const btnIn = document.getElementById('checkInBtn');
         const btnOut = document.getElementById('checkOutBtn');
         const btnAway = document.getElementById('awayBtn');
+
         if (!btnIn || !btnOut || !btnAway) return;
 
-        const currentWorkStatus = window.currentServerStatus || '';
-        const normalizedStatus = currentWorkStatus ? currentWorkStatus.toUpperCase() : '';
+        const normalizedStatus = String(
+            window.currentServerStatus || ''
+        ).toUpperCase();
 
-        const isVacation = normalizedStatus === 'VACATION';
-        const isOutsideOrTrip = (normalizedStatus === 'BUSINESS_TRIP' || normalizedStatus === 'OUTWORK');
+        const isSpecialWork = [
+            'VACATION',
+            'BUSINESS_TRIP',
+            'OUTWORK'
+        ].includes(normalizedStatus);
 
-        const hasIn = !!(currentAttendance && currentAttendance.commuteAt);
-        const hasOut = !!(currentAttendance && currentAttendance.leaveAt);
+        const hasIn = !!(
+            currentAttendance && currentAttendance.commuteAt
+        );
+
+        const hasOut = !!(
+            currentAttendance && currentAttendance.leaveAt
+        );
 
         const btnText = btnAway.querySelector('span') || btnAway;
 
-        // ✅ 휴가중: 출퇴근/자리비움 모두 클릭 불가, 텍스트는 자리비움 유지
-        if (isVacation) {
+
+        const notice = document.getElementById('attendanceStatusNotice');
+
+        if (notice) {
+            const messages = {
+                BUSINESS_TRIP:
+                    '승인된 출장 기간입니다. 출퇴근 및 자리비움 기능을 사용할 수 없습니다.',
+                OUTWORK:
+                    '승인된 외근 기간입니다. 출퇴근 및 자리비움 기능을 사용할 수 없습니다.',
+                VACATION:
+                    '휴가 기간입니다. 출퇴근 및 자리비움 기능을 사용할 수 없습니다.'
+            };
+
+            const message = messages[normalizedStatus];
+
+            notice.textContent = message || '';
+            notice.style.display = message ? 'block' : 'none';
+        }
+
+
+        // 서버 근무상태를 조회하기 전에는 버튼 비활성화
+        const statusUnknown = !normalizedStatus;
+
+        // 휴가 / 출장 / 외근 중에는 모든 출퇴근 버튼 비활성화
+        if (isSpecialWork || statusUnknown) {
             btnIn.disabled = true;
             btnOut.disabled = true;
             btnAway.disabled = true;
 
-            btnAway.classList.remove('btn-return');
-            btnAway.classList.remove('active');
+            btnAway.classList.remove('btn-return', 'active');
             btnText.textContent = '자리비움';
             return;
         }
 
-        // ✅ 외근/출장중: 자리비움 버튼을 "자리 복귀"로 변경(활성), 출퇴근 불가
-        if (isOutsideOrTrip) {
-            btnIn.disabled = true;
-            btnOut.disabled = true;
-
-            btnAway.disabled = false;
-            btnAway.classList.add('btn-return');
-            btnAway.classList.remove('active');
-            btnText.textContent = '자리 복귀';
-            return;
-        }
-
-        // ✅ 일반 근무: 기존 로직
+        // 일반 근무 상태
         btnIn.disabled = hasIn;
         btnOut.disabled = !hasIn || hasOut;
         btnAway.disabled = !hasIn || hasOut;
 
         btnAway.classList.remove('btn-return');
 
-        if (isAway) {
+        // 일반 자리비움 상태에서만 복귀 가능
+        if (
+            normalizedStatus === 'AWAY' ||
+            (isAway && normalizedStatus === 'WORKING')
+        ) {
             btnAway.classList.add('active');
             btnText.textContent = '자리비움 해제';
         } else {
@@ -336,67 +328,108 @@
         }
     }
 
+
     window.updateCommuteButtonStates = updateButtonStates;
+
 
     function setupEventListeners() {
         const checkInBtn = document.getElementById('checkInBtn');
         const checkOutBtn = document.getElementById('checkOutBtn');
         const awayBtn = document.getElementById('awayBtn');
 
+        const getStatus = () =>
+            String(window.currentServerStatus || '').toUpperCase();
+
         if (checkInBtn) {
             checkInBtn.onclick = () => {
-                const normalizedStatus = (window.currentServerStatus || '').toUpperCase();
+                if (checkInBtn.disabled) return;
 
-                if (normalizedStatus === 'VACATION') {
-                    sweetWarning('현재 휴가중이므로 출근할 수 없습니다.');
-                    return;
-                }
-                if (['BUSINESS_TRIP', 'OUTWORK'].includes(normalizedStatus)) {
-                    sweetWarning('현재 출장/외근 상태이므로 출근할 수 없습니다.\n업무 복귀 시 "자리 복귀" 버튼을 눌러주세요.');
+                const status = getStatus();
+
+                if (status === 'VACATION') {
+                    sweetWarning('현재 휴가 중이므로 출근할 수 없습니다.');
                     return;
                 }
 
-                handleAction('checkin', '출근 안내', '출근하시겠습니까?');
+                if (['BUSINESS_TRIP', 'OUTWORK'].includes(status)) {
+                    sweetWarning(
+                        '승인된 출장·외근 기간에는 출근할 수 없습니다.'
+                    );
+                    return;
+                }
+
+                handleAction(
+                    'checkin',
+                    '출근 안내',
+                    '출근하시겠습니까?'
+                );
             };
         }
 
         if (checkOutBtn) {
             checkOutBtn.onclick = () => {
-                const normalizedStatus = (window.currentServerStatus || '').toUpperCase();
+                if (checkOutBtn.disabled) return;
 
-                if (normalizedStatus === 'VACATION') {
-                    sweetWarning('현재 휴가중이므로 퇴근할 수 없습니다.');
-                    return;
-                }
-                if (['BUSINESS_TRIP', 'OUTWORK'].includes(normalizedStatus)) {
-                    sweetWarning('현재 출장/외근 상태이므로 퇴근할 수 없습니다.\n업무 복귀 시 "자리 복귀" 버튼을 눌러주세요.');
+                const status = getStatus();
+
+                if (status === 'VACATION') {
+                    sweetWarning('현재 휴가 중이므로 퇴근할 수 없습니다.');
                     return;
                 }
 
-                handleAction('checkout', '퇴근 안내', '퇴근하시겠습니까?');
+                if (['BUSINESS_TRIP', 'OUTWORK'].includes(status)) {
+                    sweetWarning(
+                        '승인된 출장·외근 기간에는 퇴근할 수 없습니다.'
+                    );
+                    return;
+                }
+
+                handleAction(
+                    'checkout',
+                    '퇴근 안내',
+                    '퇴근하시겠습니까?'
+                );
             };
         }
 
         if (awayBtn) {
-            awayBtn.onclick = async () => {
-                const normalizedStatus = (window.currentServerStatus || '').toUpperCase();
+            awayBtn.onclick = () => {
+                if (awayBtn.disabled) return;
 
-                // ✅ 휴가: 자리비움 자체 불가
-                if (normalizedStatus === 'VACATION') {
-                    sweetWarning('현재 휴가중이므로 자리비움 기능을 사용할 수 없습니다.');
+                const status = getStatus();
+
+                if (status === 'VACATION') {
+                    sweetWarning(
+                        '현재 휴가 중이므로 자리비움 기능을 사용할 수 없습니다.'
+                    );
                     return;
                 }
 
-                // ✅ 외근/출장: 자리복귀로 처리 (오늘 정상출근)
-                if (['BUSINESS_TRIP', 'OUTWORK'].includes(normalizedStatus) || awayBtn.classList.contains('btn-return')) {
-                    await handleReturnFromOutsideOrTrip();
+                if (['BUSINESS_TRIP', 'OUTWORK'].includes(status)) {
+                    sweetWarning(
+                        '승인된 출장·외근 기간에는 자리비움 기능을 사용할 수 없습니다.'
+                    );
                     return;
                 }
 
-                // ✅ 일반 근무: 기존 자리비움 start/end
-                const action = isAway ? 'away/end' : 'away/start';
-                handleAction(action, '근태 상태 변경', isAway ? '자리비움을 해제하시겠습니까?' : '자리비움을 시작하시겠습니까?');
+                // 일반 자리비움만 시작 / 해제
+                const awayActive =
+                    status === 'AWAY' ||
+                    (isAway && status === 'WORKING');
+
+                const action = awayActive
+                    ? 'away/end'
+                    : 'away/start';
+
+                handleAction(
+                    action,
+                    '근태 상태 변경',
+                    awayActive
+                        ? '자리비움을 해제하시겠습니까?'
+                        : '자리비움을 시작하시겠습니까?'
+                );
             };
         }
     }
+
 })();

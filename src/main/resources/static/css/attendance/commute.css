@@ -240,3 +240,48 @@ button:disabled {
 .rule-error-banner .banner-close:hover {
     background: rgba(239, 68, 68, 0.1);
 }
+
+
+/* 출장·외근·휴가 안내 메시지 */
+.attendance-status-notice {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: #374151;
+    font-size: 13px;
+    line-height: 1.6;
+    text-align: center;
+}
+
+/* 비활성화된 출퇴근 버튼 */
+.profile-attendance-buttons .btn-attendance:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+    box-shadow: none;
+}
+
+/* 출장 상태 배지 */
+.work-status-badge.badge-business {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* 외근 상태 배지 */
+.work-status-badge.badge-outside {
+    background-color: #ede9fe;
+    color: #6d28d9;
+}
+
+/* 휴가 상태 배지 */
+.work-status-badge.badge-vacation {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+/* 자리비움 해제 버튼 */
+.profile-attendance-buttons .btn-away.active {
+    background-color: #fef3c7;
+    color: #92400e;
+}

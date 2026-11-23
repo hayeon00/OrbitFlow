@@ -29,10 +29,24 @@ public interface CommuteRepository extends JpaRepository<Attendance, Long> {
 
     @Modifying
     @Query(value = """
-        INSERT INTO attendance (company_id, employee_id, work_date, commute_at, status)
-        VALUES (:companyId, :employeeId, :workDate, :commuteAt, :status)
-        ON DUPLICATE KEY UPDATE id = id
-    """, nativeQuery = true)
+    INSERT INTO attendance (
+        company_id,
+        employee_id,
+        work_date,
+        commute_at,
+        status,
+        is_corrected
+    )
+    VALUES (
+        :companyId,
+        :employeeId,
+        :workDate,
+        :commuteAt,
+        :status,
+        false
+    )
+    ON DUPLICATE KEY UPDATE id = id
+""", nativeQuery = true)
     void insertCheckInIgnoreDuplicate(
             @Param("companyId") Long companyId,
             @Param("employeeId") Long employeeId,
@@ -43,13 +57,14 @@ public interface CommuteRepository extends JpaRepository<Attendance, Long> {
 
     @Modifying
     @Query("""
-        UPDATE Attendance a
-        SET a.leaveAt = :leaveAt
-        WHERE a.companyId = :companyId
-          AND a.employeeId = :employeeId
-          AND a.workDate = :today
-          AND a.leaveAt IS NULL
-    """)
+    UPDATE Attendance a
+    SET a.leaveAt = :leaveAt
+    WHERE a.companyId = :companyId
+      AND a.employeeId = :employeeId
+      AND a.workDate = :today
+      AND a.commuteAt IS NOT NULL
+      AND a.leaveAt IS NULL
+""")
     int updateLeaveAtIfNull(
             @Param("companyId") Long companyId,
             @Param("employeeId") Long employeeId,
@@ -63,17 +78,17 @@ public interface CommuteRepository extends JpaRepository<Attendance, Long> {
             LocalDate workDate
     );
 
+    List<Attendance> findByCompanyIdAndEmployeeIdAndWorkDateBetween(
+            Long companyId,
+            Long employeeId,
+            LocalDate startDate,
+            LocalDate endDate
+    );
 
 
 
 
-
-
-
-
-
-
-        @Query("SELECT a FROM Attendance a WHERE a.employeeId = :employeeId " +
+    @Query("SELECT a FROM Attendance a WHERE a.employeeId = :employeeId " +
                         "AND a.workDate BETWEEN :startDate AND :endDate " +
                         "AND (:status IS NULL OR a.status = :status) " +
                         "ORDER BY a.workDate DESC")
@@ -132,6 +147,35 @@ public interface CommuteRepository extends JpaRepository<Attendance, Long> {
         boolean existsByEmployeeIdAndWorkDate(Long employeeId, LocalDate workDate);
 
 
+    long countByCompanyIdAndEmployeeIdAndWorkDate(
+            Long companyId,
+            Long employeeId,
+            LocalDate workDate
+    );
+
+    /**
+     * 이미 만들어진 출퇴근 행에 실제 출근시간이 없는 경우 보완.
+     *
+     * 호출 전 승인된 반차 여부를 검증해야 한다.
+     */
+    @Modifying
+    @Query("""
+    UPDATE Attendance a
+    SET a.commuteAt = :commuteAt,
+        a.status = :status
+    WHERE a.companyId = :companyId
+      AND a.employeeId = :employeeId
+      AND a.workDate = :workDate
+      AND a.commuteAt IS NULL
+      AND a.leaveAt IS NULL
+""")
+    int updateMissingCheckIn(
+            @Param("companyId") Long companyId,
+            @Param("employeeId") Long employeeId,
+            @Param("workDate") LocalDate workDate,
+            @Param("commuteAt") LocalDateTime commuteAt,
+            @Param("status") AttendanceStatus status
+    );
 
 
 }

@@ -1,13 +1,23 @@
-/* 근태 규칙 관리 페이지 - 깔끔한 디자인 */
 
-/* 컬러 변수 */
+/* =========================================================
+   OrbitFlow - 관리자 근태 규칙 관리
+   회사 기본 규칙 / 점심 휴게시간 / 반차 정책 / 사원별 예외 규칙
+========================================================= */
+
+/* =========================================================
+   1. 컬러 변수
+========================================================= */
+
 :root {
     --primary-color: #3B82F6;
     --primary-hover: #2563EB;
+
     --danger-color: #DC2626;
     --danger-hover: #B91C1C;
+
     --warning-color: #F59E0B;
     --success-color: #10B981;
+
     --neutral-50: #F9FAFB;
     --neutral-100: #F3F4F6;
     --neutral-200: #E5E7EB;
@@ -20,65 +30,121 @@
     --neutral-900: #111827;
 }
 
-/* 컨테이너: 게시판과 동일한 크기 */
+
+/* =========================================================
+   2. 전체 페이지 컨테이너
+========================================================= */
+
 .board-admin-container {
-    background-color: white;
+    background-color: #ffffff;
+
     border-radius: 12px;
+
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    padding: 20px;
+
+    padding: 24px;
+
     max-width: 1400px;
     margin: 0 auto;
+
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 120px);
+
+    gap: 20px;
+
+    min-height: calc(100vh - 120px);
+    height: auto;
+
     box-sizing: border-box;
 }
 
-/* 게시판 헤더 스타일 */
+
+/* =========================================================
+   3. 페이지 헤더
+========================================================= */
+
 .board-header {
-    margin-bottom: 32px;
+    margin-bottom: 8px;
     text-align: left;
 }
 
 .board-header h1 {
     font-size: 24px;
     font-weight: 700;
+
     color: var(--neutral-900);
+
     margin: 0;
+
     letter-spacing: -0.02em;
 }
 
-/* 규칙 섹션 */
-.rule-section {
-    margin-bottom: 16px;
-}
+
+/* =========================================================
+   4. 규칙 섹션 공통
+========================================================= */
 
 .rule-section {
-    margin-bottom: 16px;
+    margin-bottom: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    min-width: 0;
 }
 
 .rule-section:last-child {
-    margin-bottom: 0;
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    /* Crucial for nested flex scrolling */
+    min-height: 250px;
 }
 
 .rule-section .section-header {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 16px;
+}
+
+.section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+
+    gap: 16px;
 }
 
 .section-title {
     font-size: 18px;
     font-weight: 600;
+
     color: var(--neutral-800);
+
     margin: 0;
+
     letter-spacing: -0.01em;
+}
+
+
+/* =========================================================
+   5. 회사 기본 규칙 및 반차 정책 카드
+========================================================= */
+
+.rule-form-card {
+    background: #ffffff;
+
+    border: 1px solid var(--neutral-200);
+    border-radius: 12px;
+
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+    padding: 24px;
+
+    margin-bottom: 0;
+
+    min-width: 0;
 }
 
 .rule-form-card .section-title {
@@ -87,118 +153,178 @@
     border-bottom: none;
 }
 
-.section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
+/* 반차 정책 설명 문구 */
+.rule-form-card > p {
+    margin: 12px 0 0;
 
-.section-header .section-title {
-    margin-bottom: 0;
-}
+    font-size: 13px;
+    line-height: 1.7;
 
-/* 기본 규칙 폼 카드 */
-.rule-form-card {
-    background: #ffffff;
-    border-radius: 12px;
-    border: 1px solid var(--neutral-200);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    padding: 16px 20px;
-    margin-bottom: 16px;
+    color: var(--neutral-500);
 }
 
 .rule-form {
-    margin-top: 20px;
+    margin-top: 22px;
 }
 
 .form-row {
     display: flex;
-    gap: 40px;
+    flex-wrap: wrap;
+
+    gap: 24px 32px;
+
     align-items: flex-end;
-    margin-bottom: 24px;
+
+    margin-bottom: 22px;
+}
+
+.form-row:last-of-type {
+    margin-bottom: 0;
 }
 
 .form-group {
+    flex: 1 1 280px;
+
+    min-width: 0;
     margin-bottom: 0;
-    flex: 1;
 }
 
 .form-group:last-of-type {
     margin-bottom: 0;
 }
 
-.form-label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--neutral-700);
-    font-size: 13px;
-}
-
+.form-label,
 .form-group label {
     display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--neutral-700);
+
+    margin-bottom: 9px;
+
     font-size: 13px;
+    font-weight: 600;
+
+    color: var(--neutral-700);
 }
+
+
+/* =========================================================
+   6. 시간 입력창
+========================================================= */
 
 .time-input-group {
     display: flex;
     align-items: center;
+
     gap: 12px;
+
+    flex-wrap: wrap;
 }
 
 .time-input {
     padding: 10px 12px;
+
     border: 1.5px solid var(--neutral-300);
     border-radius: 8px;
+
     font-size: 14px;
+
     color: var(--neutral-800);
-    transition: all 0.2s ease;
-    width: 140px !important;
-    min-width: 140px;
-    max-width: 140px;
     background: #ffffff;
+
+    width: 140px;
+    min-width: 0;
+    max-width: 100%;
+
+    height: 42px;
+
     box-sizing: border-box;
+
+    transition:
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
 }
 
 .time-input:focus {
     outline: none;
+
     border-color: var(--primary-color);
+
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .time-separator {
     color: var(--neutral-500);
+
+    font-size: 14px;
     font-weight: 500;
 }
+
+/* 회사 기본 규칙 시간 입력창 */
+#defaultStartTime,
+#defaultEndTime,
+#defaultBreakStartTime,
+#defaultBreakEndTime {
+    width: 140px;
+}
+
+/* 회사별 반차 시간 */
+#morningHalfReturnTime,
+#afternoonHalfLeaveTime {
+    width: 180px;
+}
+
+
+/* =========================================================
+   7. 휴게 분 수 입력창
+========================================================= */
 
 .judgment-input {
     display: flex;
     align-items: center;
+
     gap: 8px;
 }
 
 .number-input {
     padding: 10px 12px;
+
     border: 1.5px solid var(--neutral-300);
     border-radius: 8px;
+
     font-size: 14px;
+
     color: var(--neutral-800);
-    transition: all 0.2s ease;
-    width: 120px !important;
-    min-width: 120px;
-    max-width: 120px;
     background: #ffffff;
+
+    width: 120px;
+    min-width: 0;
+    max-width: 100%;
+
+    height: 42px;
+
     box-sizing: border-box;
+
+    transition:
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
 }
 
 .number-input:focus {
     outline: none;
+
     border-color: var(--primary-color);
+
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 점심 구간을 기준으로 자동 계산되는 값 */
+.number-input[readonly] {
+    background: var(--neutral-100);
+
+    color: var(--neutral-600);
+
+    border-color: var(--neutral-200);
+
+    cursor: default;
 }
 
 .input-suffix {
@@ -206,40 +332,61 @@
     font-size: 14px;
 }
 
+
+/* =========================================================
+   8. 저장 버튼
+========================================================= */
+
 .form-actions {
     display: flex;
     justify-content: flex-end;
-    margin-top: 20px;
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 24px;
     padding-top: 20px;
+
     border-top: 1px solid var(--neutral-200);
 }
 
-/* 버튼 스타일 (자원관리와 통일) */
-/* 버튼 스타일 (자원관리와 통일) - 통합된 디자인 */
 .btn-primary {
-    background: var(--primary-color);
-    color: #fff;
-    border: none;
-    padding: 10px 20px;
-    height: auto;
-    /* Reset height */
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+
     gap: 8px;
-    transition: all 0.2s ease;
+
+    background: var(--primary-color);
+    color: #ffffff;
+
+    border: none;
+    border-radius: 8px;
+
+    padding: 10px 20px;
+
+    min-height: 40px;
+    height: auto;
+
+    font-size: 14px;
+    font-weight: 500;
+
+    cursor: pointer;
+
+    transition:
+            background-color 0.2s ease,
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
+
     box-shadow: none;
-    /* Reset shadow */
 }
 
 .btn-primary:hover {
     background: var(--primary-hover);
+
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
 .btn-primary:active {
@@ -247,29 +394,42 @@
     box-shadow: none;
 }
 
-
-/* 테이블 컨테이너 스타일 (대시보드와 통일) */
-.board-table-container {
-    margin-bottom: 24px;
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    border: 1px solid var(--neutral-200);
-    /* min-height removed to allow proper shrinking/scrolling */
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    /* Enable internal scrolling */
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
-/* 테이블 스타일 (대시보드와 통일) */
+
+/* =========================================================
+   9. 사원별 예외 규칙 테이블
+========================================================= */
+
+.board-table-container {
+    background: #ffffff;
+
+    border: 1px solid var(--neutral-200);
+    border-radius: 12px;
+
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+    margin-bottom: 0;
+
+    min-width: 0;
+
+    overflow-x: auto;
+    overflow-y: auto;
+
+    max-height: 480px;
+}
+
 .board-table {
     width: 100%;
+
+    min-width: 950px;
+
     border-collapse: collapse;
+
     table-layout: fixed;
-    /* height: 100%; removed to prevent row stretching */
 }
 
 .board-table thead {
@@ -277,30 +437,41 @@
 }
 
 .board-table th {
-    padding: 14px 16px;
-    font-weight: 600;
-    font-size: 13px;
-    color: var(--neutral-700);
-    border-bottom: 1px solid var(--neutral-200);
-    text-align: center;
+    padding: 14px 12px;
+
     background: var(--neutral-50);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+
+    border-bottom: 1px solid var(--neutral-200);
+
+    color: var(--neutral-700);
+
+    font-size: 13px;
+    font-weight: 600;
+
+    letter-spacing: 0.3px;
+
+    text-align: center;
+
     position: sticky;
     top: 0;
     z-index: 10;
 }
 
 .board-table td {
-    padding: 14px 16px;
+    padding: 14px 12px;
+
     border-bottom: 1px solid var(--neutral-100);
-    font-size: 14px;
+
+    font-size: 13px;
+
     color: var(--neutral-800);
-    vertical-align: middle;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    box-sizing: border-box;
+
     text-align: center;
+    vertical-align: middle;
+
+    overflow-wrap: anywhere;
+
+    box-sizing: border-box;
 }
 
 .board-table tbody tr {
@@ -315,114 +486,134 @@
     border-bottom: none;
 }
 
-/* 테이블 컬럼 정렬 */
-
-/* 테이블 컬럼 정렬 및 너비 설정 */
-/* 테이블 컬럼 정렬 및 너비 설정 - 동일 간격 (12.5% * 8 = 100%) */
 #exceptionTable th:nth-child(1),
 #exceptionTable td:nth-child(1) {
-    text-align: center;
-    width: 12.5%;
-    /* 대상 사원 */
-}
-
-#exceptionTable td small {
-    display: block;
-    color: var(--neutral-500);
-    margin-top: 2px;
-    font-size: 12px;
+    width: 12%;
 }
 
 #exceptionTable th:nth-child(2),
 #exceptionTable td:nth-child(2) {
-    text-align: center;
-    white-space: nowrap;
-    width: 12.5%;
-    /* 적용 기간 */
+    width: 18%;
 }
 
 #exceptionTable th:nth-child(3),
-#exceptionTable td:nth-child(3),
-#exceptionTable th:nth-child(4),
-#exceptionTable td:nth-child(4) {
-    text-align: center;
-    width: 12.5%;
-    /* 시간 */
+#exceptionTable td:nth-child(3) {
+    width: 10%;
 }
 
+#exceptionTable th:nth-child(4),
+#exceptionTable td:nth-child(4) {
+    width: 10%;
+}
+
+/* 휴게시간 구간이 길어질 수 있으므로 너비 확대 */
 #exceptionTable th:nth-child(5),
 #exceptionTable td:nth-child(5) {
-    text-align: center;
-    width: 12.5%;
-    /* 휴게 */
+    width: 17%;
 }
 
 #exceptionTable th:nth-child(6),
 #exceptionTable td:nth-child(6) {
-    text-align: center;
-    /* 사유도 중앙 정렬 */
-    width: 12.5%;
-    /* 사유 */
+    width: 13%;
 }
 
 #exceptionTable th:nth-child(7),
 #exceptionTable td:nth-child(7) {
-    text-align: center;
-    width: 12.5%;
-    /* 등록일 */
+    width: 10%;
 }
 
 #exceptionTable th:nth-child(8),
 #exceptionTable td:nth-child(8) {
-    text-align: center;
-    width: 12.5%;
-    /* 관리 */
+    width: 10%;
 }
 
-/* 테이블 액션 버튼 (자원관리와 통일) */
+#exceptionTable td small {
+    display: block;
+
+    margin-top: 2px;
+
+    font-size: 12px;
+
+    color: var(--neutral-500);
+}
+
+
+/* =========================================================
+   10. 테이블 수정 / 삭제 버튼
+========================================================= */
+
 .btn-edit,
 .btn-delete {
     padding: 6px 12px;
-    border-radius: 12px;
-    font-size: 13px;
+
+    border-radius: 8px;
+
+    font-size: 12px;
+    font-weight: 500;
+
     cursor: pointer;
-    transition: background 0.2s;
+
+    transition: background-color 0.2s ease;
 }
 
 .btn-edit {
-    background: #e3f2fd;
-    border: 1.2px solid #6d8cdc;
-    color: #1976d2;
+    background: #E3F2FD;
+
+    border: 1.2px solid #6D8CDC;
+
+    color: #1976D2;
 }
 
 .btn-edit:hover {
-    background: #bbdefb;
+    background: #BBDEFB;
 }
 
 .btn-delete {
-    background: #ffebee;
-    border: 1.2px solid #e79898;
-    color: #c62828;
+    background: #FFEBEE;
+
+    border: 1.2px solid #E79898;
+
+    color: #C62828;
 }
 
 .btn-delete:hover {
-    background: #ffcdd2;
+    background: #FFCDD2;
 }
 
-/* 액션 링크 컨테이너 */
+/* 버튼이 나란히 놓이도록 간격 부여 */
+#exceptionTable td:last-child {
+    white-space: nowrap;
+}
+
+#exceptionTable td:last-child .btn-edit,
+#exceptionTable td:last-child .btn-delete {
+    margin: 2px;
+}
+
+
+/* =========================================================
+   11. 기존 액션 링크 호환
+========================================================= */
+
 .action-links {
     display: flex;
+
     gap: 8px;
+
     justify-content: center;
     align-items: center;
+
+    flex-wrap: wrap;
 }
 
-/* 하위 호환성을 위한 기존 스타일 유지 */
 .action-links a {
     color: var(--primary-color);
+
     text-decoration: none;
+
     font-size: 13px;
     font-weight: 500;
+
     transition: color 0.2s ease;
 }
 
@@ -439,25 +630,39 @@
     color: var(--danger-hover);
 }
 
-/* 경고 박스 */
+
+/* =========================================================
+   12. 경고 메시지
+========================================================= */
+
 .warning-box {
     background: #FFFBEB;
+
     border: 1px solid #FCD34D;
     border-radius: 8px;
+
     padding: 14px 18px;
+
     margin-top: 20px;
+
     font-size: 13px;
-    color: #78350F;
     line-height: 1.6;
+
+    color: #78350F;
+
     display: flex;
     align-items: flex-start;
+
     gap: 10px;
 }
 
 .warning-box i {
-    color: #F59E0B;
+    color: var(--warning-color);
+
     margin-top: 2px;
+
     flex-shrink: 0;
+
     font-size: 16px;
 }
 
@@ -465,31 +670,58 @@
     font-weight: 600;
 }
 
-/* 모달 스타일 */
+
+/* =========================================================
+   13. 모달 배경
+========================================================= */
+
 .modal {
     display: none;
+
     position: fixed;
+
     z-index: 9999;
+
     left: 0;
     top: 0;
+
     width: 100%;
     height: 100%;
+
     background-color: rgba(0, 0, 0, 0.5);
+
     overflow: auto;
+
     backdrop-filter: blur(2px);
 }
 
+
+/* =========================================================
+   14. 모달 본문
+========================================================= */
+
 .modal-content {
-    background-color: #fff;
-    margin: 5% auto;
+    background-color: #ffffff;
+
+    margin: 4vh auto;
+
     padding: 0;
+
     border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
+
+    width: calc(100% - 32px);
+    max-width: 680px;
+
     max-height: 90vh;
+
     overflow-y: auto;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+    box-shadow:
+            0 20px 25px -5px rgba(0, 0, 0, 0.1),
+            0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
     position: relative;
+
     z-index: 10000;
 }
 
@@ -497,24 +729,34 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: 32px 32px 24px 32px;
+
+    gap: 16px;
+
+    padding: 24px 28px;
+
     border-bottom: 1px solid var(--neutral-200);
 }
 
 .modal-header h3 {
     margin: 0;
+
     font-size: 20px;
     font-weight: 600;
+
     color: var(--neutral-800);
+
     letter-spacing: -0.02em;
 }
 
 .close {
     color: var(--neutral-400);
+
     font-size: 28px;
-    font-weight: bold;
+    font-weight: 700;
+
     cursor: pointer;
-    transition: color 0.2s;
+
+    transition: color 0.2s ease;
 }
 
 .close:hover {
@@ -522,10 +764,14 @@
 }
 
 .modal-body {
-    padding: 32px;
+    padding: 28px;
 }
 
-/* 폼 섹션 스타일 */
+
+/* =========================================================
+   15. 모달 폼 섹션
+========================================================= */
+
 .form-section {
     margin-bottom: 24px;
 }
@@ -536,127 +782,214 @@
 
 .section-content {
     background: var(--neutral-50);
+
     padding: 20px;
-    border-radius: 8px;
+
     border: 1px solid var(--neutral-200);
+    border-radius: 8px;
 }
 
 .section-label {
     display: block;
-    font-weight: 600;
-    color: var(--neutral-700);
-    margin-bottom: 12px;
+
     font-size: 14px;
+    font-weight: 600;
+
+    color: var(--neutral-700);
+
+    margin-bottom: 12px;
 }
 
-/* 검색 필드 */
+
+/* =========================================================
+   16. 사원 검색
+========================================================= */
+
 .employee-search-group {
     display: flex;
+
     gap: 8px;
 }
 
 .form-control {
     flex: 1;
+
+    min-width: 0;
+
     padding: 10px 12px;
+
     border: 1.5px solid var(--neutral-300);
     border-radius: 8px;
+
     font-size: 14px;
-    transition: all 0.2s ease;
+
+    transition:
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
 }
 
 .form-control:focus {
     border-color: var(--primary-color);
+
     outline: none;
+
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .btn-search {
     background: var(--primary-color);
-    color: white;
+
+    color: #ffffff;
+
     border: none;
-    padding: 0 16px;
     border-radius: 8px;
+
+    padding: 0 16px;
+
     font-size: 14px;
+
     cursor: pointer;
-    transition: background 0.2s;
+
+    transition: background-color 0.2s ease;
 }
 
 .btn-search:hover {
     background: var(--primary-hover);
 }
 
-/* 날짜 입력 그룹 */
+
+/* =========================================================
+   17. 날짜 입력 그룹
+========================================================= */
+
 .date-input-group {
     display: flex;
+
     gap: 20px;
 }
 
 .date-field {
     flex: 1;
+
+    min-width: 0;
 }
 
 .date-field label {
     display: block;
-    font-size: 12px;
-    color: var(--neutral-500);
+
     margin-bottom: 4px;
+
+    font-size: 12px;
+
+    color: var(--neutral-500);
 }
 
 .date-input {
     width: 100%;
+
     padding: 10px 12px;
+
     border: 1.5px solid var(--neutral-300);
     border-radius: 8px;
+
     font-size: 14px;
+
+    background: #ffffff;
+
     box-sizing: border-box;
 }
 
-/* 시간 입력 필드 */
+
+/* =========================================================
+   18. 사원별 예외 근무시간 입력
+========================================================= */
+
 .override-fields {
-    background: white;
+    background: #ffffff;
+
     padding: 16px;
-    border-radius: 8px;
+
     border: 1px solid var(--neutral-200);
+    border-radius: 8px;
 }
 
+/*
+   기존에는 3개 필드를 한 줄에 고정했지만
+   현재는 출근, 퇴근, 휴게 분 수,
+   점심 시작, 점심 종료 총 5개이므로
+   자동 줄바꿈이 필요합니다.
+*/
 .override-row {
-    display: flex;
+    display: grid;
+
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
     gap: 16px;
 }
 
 .override-field {
-    flex: 1;
+    min-width: 0;
 }
 
 .override-field label {
     display: block;
+
+    margin-bottom: 6px;
+
     font-size: 12px;
-    color: var(--neutral-500);
-    margin-bottom: 4px;
+    font-weight: 500;
+
+    color: var(--neutral-600);
 }
 
 .override-field .time-input,
 .override-field .number-input {
+    display: block;
+
     width: 100% !important;
+    max-width: 100%;
+
     min-width: 0;
+
+    height: 42px;
 }
 
-/* 사유 입력 */
+
+/* =========================================================
+   19. 사유 입력
+========================================================= */
+
 .reason-textarea {
     width: 100%;
     height: 80px;
+
     padding: 12px;
+
     border: 1.5px solid var(--neutral-300);
     border-radius: 8px;
-    resize: none;
+
+    resize: vertical;
+
     font-size: 14px;
+
     box-sizing: border-box;
+}
+
+.reason-textarea:focus {
+    outline: none;
+
+    border-color: var(--primary-color);
+
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .char-count-wrapper {
     text-align: right;
+
     margin-top: 4px;
+
     font-size: 12px;
+
     color: var(--neutral-500);
 }
 
@@ -664,41 +997,70 @@
     color: var(--danger-color);
 }
 
-/* 모달 하단 버튼 */
-.form-actions {
+
+/* =========================================================
+   20. 모달 하단 버튼
+========================================================= */
+
+.modal .form-actions {
     display: flex;
+
     justify-content: flex-end;
+    align-items: center;
+
     gap: 12px;
-    margin-top: 32px;
-    padding-top: 24px;
+
+    margin-top: 28px;
+    padding-top: 22px;
+
     border-top: 1px solid var(--neutral-200);
 }
 
 .btn-secondary {
-    background: white;
+    background: #ffffff;
+
     border: 1px solid var(--neutral-300);
-    color: var(--neutral-700);
-    padding: 10px 20px;
     border-radius: 8px;
+
+    color: var(--neutral-700);
+
+    padding: 10px 20px;
+
     font-size: 14px;
     font-weight: 500;
+
     cursor: pointer;
-    transition: all 0.2s;
+
+    transition:
+            background-color 0.2s ease,
+            border-color 0.2s ease;
 }
 
 .btn-secondary:hover {
     background: var(--neutral-50);
+
     border-color: var(--neutral-400);
 }
 
-/* 사원 검색 결과 */
+
+/* =========================================================
+   21. 사원 검색 결과
+========================================================= */
+
 .employee-search-results {
     margin-top: 8px;
+
     max-height: 150px;
+
     overflow-y: auto;
+
     border: 1px solid var(--neutral-200);
     border-radius: 8px;
-    display: empty;
+}
+
+/* 검색 결과가 없을 때는 빈 영역 숨김 */
+.employee-search-results:empty {
+    display: none;
 }
 
 .employee-search-results:not(:empty) {
@@ -707,17 +1069,23 @@
 
 .employee-list {
     list-style: none;
+
     padding: 0;
     margin: 0;
 }
 
 .employee-item {
     padding: 10px 12px;
+
     border-bottom: 1px solid var(--neutral-100);
+
     cursor: pointer;
+
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+
+    gap: 8px;
 }
 
 .employee-item:last-child {
@@ -730,62 +1098,637 @@
 
 .employee-name {
     font-weight: 600;
+
     color: var(--neutral-800);
 }
 
 .employee-details {
     font-size: 13px;
+
     color: var(--neutral-500);
 }
 
 .selected-employee-info {
     margin-top: 12px;
+
     padding: 10px 12px;
+
     background: #EFF6FF;
+
     border: 1px solid #DBEAFE;
     border-radius: 8px;
+
     color: #1E40AF;
+
     font-size: 14px;
 }
 
-/* 수정 모달 내 정보 표시 */
+
+/* =========================================================
+   22. 수정 모달의 사원 정보
+========================================================= */
+
 .employee-info-display {
     display: flex;
     flex-direction: column;
+
     gap: 8px;
 }
 
 .info-field {
     display: flex;
     align-items: center;
+
     gap: 8px;
+
     font-size: 14px;
 }
 
 .info-field label {
     font-weight: 600;
+
     color: var(--neutral-600);
-    width: 80px;
+
+    width: 90px;
+
+    flex-shrink: 0;
 }
 
 .info-field span {
     color: var(--neutral-900);
+
+    overflow-wrap: anywhere;
 }
 
 
+/* =========================================================
+   23. 태블릿
+========================================================= */
 
-/* =========================
-   Responsive Column Hiding
-======================== */
-/* 1000px 이하: 휴게시간, 사유, 등록일 열 숨김 */
 @media (max-width: 1000px) {
 
-    #exceptionTable th:nth-child(5),
-    #exceptionTable td:nth-child(5),
-    #exceptionTable th:nth-child(6),
-    #exceptionTable td:nth-child(6),
-    #exceptionTable th:nth-child(7),
-    #exceptionTable td:nth-child(7) {
-        display: none;
+    .board-admin-container {
+        padding: 20px;
+    }
+
+    .form-row {
+        gap: 20px;
+    }
+
+    .override-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* 컬럼을 숨기지 않고 가로 스크롤을 허용 */
+    .board-table {
+        min-width: 950px;
     }
 }
+
+
+/* =========================================================
+   24. 모바일
+========================================================= */
+
+@media (max-width: 640px) {
+
+    .board-admin-container {
+        padding: 16px;
+
+        border-radius: 8px;
+
+        min-height: auto;
+
+        gap: 16px;
+    }
+
+    .board-header h1 {
+        font-size: 20px;
+    }
+
+    .rule-form-card {
+        padding: 18px;
+    }
+
+    .section-title {
+        font-size: 16px;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .rule-section .section-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-row {
+        flex-direction: column;
+
+        align-items: stretch;
+
+        gap: 18px;
+    }
+
+    .form-group {
+        flex: 1 1 auto;
+
+        width: 100%;
+    }
+
+    .time-input-group {
+        gap: 8px;
+    }
+
+    .time-input-group .time-input {
+        flex: 1;
+
+        width: 0;
+        min-width: 0;
+    }
+
+    #morningHalfReturnTime,
+    #afternoonHalfLeaveTime {
+        width: 100%;
+    }
+
+    .modal-content {
+        width: calc(100% - 20px);
+
+        max-height: 94vh;
+
+        margin: 3vh auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+    }
+
+    .modal-header h3 {
+        font-size: 17px;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .section-content {
+        padding: 14px;
+    }
+
+    .date-input-group {
+        flex-direction: column;
+
+        gap: 12px;
+    }
+
+    .override-fields {
+        padding: 12px;
+    }
+
+    .override-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+
+        gap: 12px;
+    }
+
+    .form-actions {
+        flex-wrap: wrap;
+    }
+
+    .modal .form-actions .btn-primary,
+    .modal .form-actions .btn-secondary {
+        flex: 1;
+    }
+}
+
+
+/* =========================================================
+   25. 작은 모바일 화면
+========================================================= */
+
+@media (max-width: 400px) {
+
+    .override-row {
+        grid-template-columns: 1fr;
+    }
+
+    .time-input-group {
+        flex-wrap: wrap;
+    }
+
+    .rule-form-card {
+        padding: 14px;
+    }
+
+    .modal-header {
+        padding: 16px;
+    }
+
+    .modal-body {
+        padding: 12px;
+    }
+}
+
+
+/* =========================================================
+   OrbitFlow 근태 규칙 관리 - 한 화면 컴팩트 레이아웃
+   기존 admin-rule.css 맨 아래에 추가
+========================================================= */
+
+/* 1. 화면 전체 높이 고정 */
+.board-admin-container {
+    height: calc(100dvh - 140px);
+    min-height: 0;
+    max-height: calc(100dvh - 140px);
+
+    overflow: hidden;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: 12px;
+    padding: 18px 20px;
+}
+
+/* 2. 페이지 제목 간격 축소 */
+.board-admin-container .board-header {
+    margin: 0 0 4px;
+    flex-shrink: 0;
+}
+
+.board-admin-container .board-header h1 {
+    font-size: 22px;
+}
+
+/* 3. 카드 영역이 불필요하게 늘어나지 않도록 */
+.board-admin-container > .rule-section {
+    margin: 0;
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+/* 4. 카드 내부 간격 줄이기 */
+.board-admin-container .rule-form-card {
+    padding: 15px 20px;
+    margin: 0;
+    border-radius: 10px;
+}
+
+.board-admin-container .section-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+/* 5. 회사 기본 규칙: 한 줄에 3개 영역 */
+.board-admin-container .default-rule-row {
+    display: grid;
+    grid-template-columns:
+        minmax(320px, 1.2fr)
+        minmax(320px, 1.2fr)
+        minmax(140px, 0.6fr);
+
+    gap: 18px;
+    align-items: end;
+    margin: 0;
+}
+
+.board-admin-container .default-rule-row .form-group {
+    min-width: 0;
+    margin: 0;
+}
+
+.board-admin-container .default-rule-row .time-input-group {
+    flex-wrap: nowrap;
+    gap: 8px;
+}
+
+/* 6. 시간 입력창 컴팩트화 */
+.board-admin-container .time-input {
+    height: 38px;
+    padding: 7px 10px;
+    font-size: 13px;
+
+    width: 140px;
+    max-width: 100%;
+}
+
+.board-admin-container .number-input {
+    height: 38px;
+    padding: 7px 10px;
+    font-size: 13px;
+}
+
+.board-admin-container .form-label {
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+/* 7. 기본 휴게시간 입력창 */
+.board-admin-container .break-minutes-group .judgment-input {
+    gap: 8px;
+}
+
+.board-admin-container #defaultBreakMinutes {
+    width: 100px;
+    background-color: #f3f4f6;
+}
+
+/* 8. 폼 상단·하단 여백 축소 */
+.board-admin-container .rule-form {
+    margin-top: 12px;
+}
+
+.board-admin-container .form-row {
+    margin-bottom: 0;
+}
+
+.board-admin-container .rule-form-card .form-actions {
+    margin-top: 12px;
+    padding-top: 10px;
+}
+
+/* 9. 저장 버튼 */
+.board-admin-container .btn-primary {
+    min-height: 36px;
+    padding: 7px 16px;
+    font-size: 13px;
+    border-radius: 7px;
+}
+
+/* 10. 반차 정책 카드 높이 축소 */
+.board-admin-container > .rule-section:nth-of-type(2)
+.rule-form-card > p {
+    margin: 5px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.board-admin-container > .rule-section:nth-of-type(2)
+.rule-form {
+    margin-top: 10px;
+}
+
+.board-admin-container > .rule-section:nth-of-type(2)
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: end;
+}
+
+/* 11. 사원별 예외 규칙 영역은 남은 높이를 사용 */
+.board-admin-container > .rule-section:last-child {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+
+    display: flex;
+    flex-direction: column;
+}
+
+.board-admin-container > .rule-section:last-child
+.section-header {
+    margin: 0 0 10px;
+    flex-shrink: 0;
+}
+
+/* 12. 테이블 내부에서만 스크롤 */
+.board-admin-container .board-table-container {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+
+    overflow-y: auto;
+    overflow-x: auto;
+
+    margin: 0;
+}
+
+/* 13. 테이블 행 높이 축소 */
+.board-admin-container .board-table th {
+    padding: 10px 12px;
+    font-size: 12px;
+}
+
+.board-admin-container .board-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+}
+
+/* 14. 테이블 관리 버튼 */
+.board-admin-container .btn-edit,
+.board-admin-container .btn-delete {
+    padding: 5px 9px;
+    font-size: 12px;
+}
+
+/* =========================================================
+   반응형: 작은 화면에서는 페이지 스크롤 허용
+========================================================= */
+
+@media (max-width: 1200px) {
+    .board-admin-container .default-rule-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .board-admin-container .default-rule-row
+    .break-minutes-group {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 900px) {
+    .board-admin-container {
+        height: auto;
+        max-height: none;
+        min-height: calc(100dvh - 140px);
+        overflow: visible;
+    }
+
+    .board-admin-container > .rule-section:last-child {
+        flex: none;
+        min-height: 260px;
+        overflow: visible;
+    }
+
+    .board-admin-container .board-table-container {
+        min-height: 250px;
+        max-height: 400px;
+    }
+
+    .board-admin-container .default-rule-row {
+        grid-template-columns: 1fr;
+    }
+
+    .board-admin-container .default-rule-row
+    .break-minutes-group {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .board-admin-container {
+        padding: 14px;
+    }
+
+    .board-admin-container .rule-form-card {
+        padding: 14px;
+    }
+
+    .board-admin-container > .rule-section:nth-of-type(2)
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .board-admin-container .default-rule-row
+    .time-input-group {
+        flex-wrap: wrap;
+    }
+}
+
+
+/* =========================================================
+   근태 규칙 관리 - 최종 배치 보정
+   1. 예외 규칙 추가 버튼 오른쪽 정렬
+   2. 테이블이 화면 하단까지 남은 공간 사용
+========================================================= */
+
+/* 전체 페이지 영역을 화면 높이에 맞춤 */
+.board-admin-container {
+    height: calc(100dvh - 112px);
+    max-height: calc(100dvh - 112px);
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+
+    gap: 12px;
+
+    padding-bottom: 16px;
+}
+
+/* 회사 기본 규칙과 반차 정책 카드는 고정 높이 */
+.board-admin-container > .rule-section:not(:last-child) {
+    flex: 0 0 auto;
+}
+
+/* 예외 규칙 영역은 남은 공간을 모두 차지 */
+.board-admin-container > .rule-section:last-child {
+    flex: 1 1 0;
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+
+/* 예외 규칙 헤더를 카드 저장 버튼과 같은 우측 끝에 정렬 */
+.board-admin-container > .rule-section:last-child
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    width: 100%;
+
+    margin: 0 0 10px;
+    padding: 0;
+
+    box-sizing: border-box;
+
+    flex-shrink: 0;
+}
+
+/* 추가 버튼을 오른쪽 끝에 배치 */
+#addExceptionRuleBtn {
+    margin-left: auto;
+    margin-right: 0;
+
+    min-height: 36px;
+    padding: 7px 16px;
+
+    white-space: nowrap;
+}
+
+/* 목록 테이블이 남은 세로 공간을 채움 */
+.board-admin-container #exceptionTable {
+    width: 100%;
+}
+
+.board-admin-container .board-table-container {
+    flex: 1 1 0;
+
+    min-height: 0;
+    max-height: none;
+
+    margin-bottom: 0;
+
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+/* 페이지 제목과 하단 영역 여백 최소화 */
+.board-admin-container .board-header {
+    margin-bottom: 2px;
+}
+
+.board-admin-container > .rule-section:last-child
+.section-header .section-title {
+    margin: 0;
+}
+
+/* 큰 모니터에서 목록이 충분히 확장되도록 */
+@media (min-width: 1201px) {
+    .board-admin-container {
+        min-height: calc(100dvh - 112px);
+    }
+}
+
+/* 화면 높이가 낮으면 콘텐츠가 잘리지 않게 페이지 스크롤 허용 */
+@media (max-height: 740px) {
+    .board-admin-container {
+        height: auto;
+        max-height: none;
+        min-height: calc(100dvh - 112px);
+
+        overflow: visible;
+    }
+
+    .board-admin-container > .rule-section:last-child {
+        min-height: 230px;
+        overflow: visible;
+    }
+
+    .board-admin-container .board-table-container {
+        min-height: 180px;
+        max-height: 360px;
+    }
+}
+
+/* 태블릿과 모바일에서는 기존 반응형 레이아웃 유지 */
+@media (max-width: 900px) {
+    .board-admin-container {
+        height: auto;
+        max-height: none;
+        min-height: calc(100dvh - 112px);
+
+        overflow: visible;
+    }
+
+    .board-admin-container > .rule-section:last-child {
+        min-height: 250px;
+        overflow: visible;
+    }
+
+    .board-admin-container .board-table-container {
+        min-height: 220px;
+        max-height: 400px;
+    }
+}
+

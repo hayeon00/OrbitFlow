@@ -1,5 +1,6 @@
 package com.finalproj.orbitflow.approval.document.service.application;
 
+import com.finalproj.orbitflow.approval.form.template.group.enums.BaseRole;
 import com.finalproj.orbitflow.approval.line.entity.ApprovalLine;
 import com.finalproj.orbitflow.approval.line.enums.ApprovalStatus;
 import com.finalproj.orbitflow.approval.line.repository.ApprovalLineRepository;
@@ -58,6 +59,7 @@ public class DocumentApprovalApplicationService {
     private final DocumentAccessValidator documentAccessValidator;
     private final DocumentSignatureService documentSignatureService;
     private final ApproverResolver approverResolver;
+    private final ApprovalEventTxService approvalEventTxService;
 
 
     @Transactional
@@ -149,6 +151,15 @@ public class DocumentApprovalApplicationService {
         } else {
             // 6-3. 다음 결재자가 없다 → 최종 승인 (기존 로직 그대로)
             document.approve();
+
+            // 휴가인 경우 동일 트랜잭션에서 처리
+            if (document.getTemplateGroup().getBaseRole()
+                    == BaseRole.VACATION) {
+
+                approvalEventTxService.processVacationApproval(
+                        document.getId()
+                );
+            }
 
             String shortTitle = DocumentTextFormatter.shortenTitle(document.getTitle(), 20);
 

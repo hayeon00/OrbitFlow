@@ -163,6 +163,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     async function loadManualList(categoryId) {
         try {
             const token = sessionStorage.getItem('accessToken');
@@ -185,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const isActive = manual.isActive === true || manual.active === true;
 
                         row.innerHTML = `
-                            <td>${manual.fileName || '알 수 없음'}</td>
+                            <td>${escapeHtml(manual.fileName || '알 수 없음')}</td>
                             <td>${registeredDate}</td>
                             <td>
                                 <div class="toggle-row" style="justify-content: center;">

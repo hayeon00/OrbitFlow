@@ -5,8 +5,8 @@ import com.finalproj.orbitflow.approval.attendance.record.repository.AttendanceR
 import com.finalproj.orbitflow.approval.document.enums.DocumentStatus;
 import com.finalproj.orbitflow.approval.document.service.domain.CalendarWorkingDayService;
 import com.finalproj.orbitflow.approval.form.template.group.enums.BaseRole;
-import com.finalproj.orbitflow.attendance.leave.dto.LeaveValidationReqDto;
-import com.finalproj.orbitflow.attendance.leave.dto.LeaveValidationResDto;
+import com.finalproj.orbitflow.attendance.leave.dto.request.LeaveValidationReqDto;
+import com.finalproj.orbitflow.attendance.leave.dto.response.LeaveValidationResDto;
 import com.finalproj.orbitflow.attendance.leave.entity.LeaveBalance;
 import com.finalproj.orbitflow.attendance.leave.entity.LeaveType;
 import com.finalproj.orbitflow.attendance.leave.repository.LeaveBalanceRepository;

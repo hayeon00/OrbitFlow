@@ -1,5 +1,6 @@
 package com.finalproj.orbitflow.attendance.leave.entity;
 
+import com.finalproj.orbitflow.attendance.leave.enums.LeaveAttendancePolicy;
 import com.finalproj.orbitflow.global.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -39,4 +40,15 @@ public class LeaveType extends BaseEntity {
 
     @Column(precision = 5, scale = 3)
     private BigDecimal unitDays;
+
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "attendance_policy",
+            nullable = false,
+            length = 30
+    )
+    private LeaveAttendancePolicy attendancePolicy;
+
+
 }

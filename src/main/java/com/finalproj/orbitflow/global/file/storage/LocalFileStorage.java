@@ -15,7 +15,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 @Service
-@Profile("local")
+@Profile({"local", "dev"})
 @Slf4j
 public class LocalFileStorage implements FileStorage {
 

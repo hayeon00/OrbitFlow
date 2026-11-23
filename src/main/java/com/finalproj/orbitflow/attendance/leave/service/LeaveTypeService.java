@@ -1,6 +1,6 @@
 package com.finalproj.orbitflow.attendance.leave.service;
 
-import com.finalproj.orbitflow.attendance.leave.dto.LeaveTypeResDto;
+import com.finalproj.orbitflow.attendance.leave.dto.response.LeaveTypeResDto;
 import com.finalproj.orbitflow.attendance.leave.entity.LeaveType;
 import com.finalproj.orbitflow.attendance.leave.repository.LeaveTypeRepository;
 import lombok.RequiredArgsConstructor;

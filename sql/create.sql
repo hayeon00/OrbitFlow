@@ -283,6 +283,7 @@ CREATE TABLE leave_type
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,
     type_name    VARCHAR(50)   NOT NULL,
     is_countable BOOLEAN       NOT NULL,
+    attendance_policy VARCHAR(30) NOT NULL DEFAULT 'REVIEW_REQUIRED' COMMENT 'ATTENDANCE_CREDIT / PARTIAL_DAY / EXCLUDED / REVIEW_REQUIRED',
     description  VARCHAR(255),
 
     unit_days    DECIMAL(5, 3) NOT NULL,
@@ -688,7 +689,7 @@ CREATE TABLE attendance_record
     start_date         DATE          NOT NULL,
     end_date           DATE          NOT NULL,
 
-    days               DECIMAL(4, 1) NOT NULL,
+    days               DECIMAL(6, 2) NOT NULL,
 
     type_id            BIGINT        NOT NULL,
     reason             VARCHAR(255),
@@ -1295,6 +1296,8 @@ CREATE TABLE attendance_rule
     default_start_time        TIME      NOT NULL COMMENT '기본 출근 기준 시간 (09:00)',
     default_end_time          TIME      NOT NULL COMMENT '기본 퇴근 기준 시간 (18:00)',
     default_break_minutes     INT                DEFAULT 60 COMMENT '기본 휴게 시간 (분 단위, 60분)',
+    break_start_time          TIME               NULL COMMENT '회사 기본 점심 휴게 시작시각',
+    break_end_time            TIME               NULL COMMENT '회사 기본 점심 휴게 종료시각',
     late_threshold_min        INT                DEFAULT 10 COMMENT '지각 판정 허용 시간 (분)',
     early_leave_threshold_min INT                DEFAULT 10 COMMENT '조퇴 판정 허용 시간 (분)',
     is_default                BOOLEAN   NOT NULL DEFAULT TRUE COMMENT '회사의 기본 주 규칙 여부',
@@ -1307,6 +1310,24 @@ CREATE TABLE attendance_rule
 ) ENGINE = InnoDB;
 
 
+-- =========================================================
+-- 회사별 반차 시간 정책 (한 회사에 기본 정책 하나)
+-- 오전반차: 오전 휴가 후 출근할 시각
+-- 오후반차: 오전 근무 후 퇴근할 시각
+-- =========================================================
+CREATE TABLE leave_time_policy
+(
+    id                         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    company_id                 BIGINT NOT NULL,
+    morning_half_return_time   TIME NOT NULL COMMENT '오전반차 이후 출근 시각',
+    afternoon_half_leave_time  TIME NOT NULL COMMENT '오후반차 시작 전 퇴근 시각',
+    created_at                 DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                 DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_leave_time_policy_company UNIQUE (company_id),
+    CONSTRAINT fk_leave_time_policy_company FOREIGN KEY (company_id) REFERENCES company(id)
+) ENGINE = InnoDB;
+
+
 CREATE TABLE employee_att_rule
 (
     id            BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '아이디',
@@ -1315,6 +1336,8 @@ CREATE TABLE employee_att_rule
     start_time    TIME COMMENT '지정 출근 시간 (오버라이드)',
     end_time      TIME COMMENT '지정 퇴근 시간 (오버라이드)',
     break_minutes INT COMMENT '지정 휴게 시간 (분)',
+    break_start_time TIME NULL COMMENT '사원 예외 점심 휴게 시작시각',
+    break_end_time TIME NULL COMMENT '사원 예외 점심 휴게 종료시각',
     reason        VARCHAR(255) COMMENT '예외규칙 적용 사유',
     valid_from    DATE    NOT NULL COMMENT '규칙 적용 시작일',
     valid_to DATE NULL COMMENT '규칙 적용 종료일 (NULL: 무기한)',
@@ -1350,36 +1373,74 @@ CREATE TABLE attendance
 
 
 
+-- =========================================================
+-- ANNUAL LEAVE: 입사일 기준 발생 / 부여 건별 잔여량 / 사용 배분
+-- grant_history가 연차 원장(정본)이며 leave_balance는 연도별 조회용 집계
+-- =========================================================
 CREATE TABLE leave_balance
 (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '아이디',
-    company_id      BIGINT    NOT NULL,
-    employee_id     BIGINT    NOT NULL COMMENT '직원 아이디',
-    year            INT       NOT NULL COMMENT '연차 기준 연도',
-    total_granted   DECIMAL(5, 2)      DEFAULT 0.0 COMMENT '총 부여 일수',
-    remaining_days  DECIMAL(5, 2)      DEFAULT 0.0 COMMENT '잔여 일수',
-    last_updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 업데이트 시각',
-    UNIQUE KEY uk_employee_year (company_id, employee_id, year),
-    FOREIGN KEY (company_id) REFERENCES company (id),
-    FOREIGN KEY (employee_id) REFERENCES employee (id)
-);
+    company_id      BIGINT       NOT NULL,
+    employee_id     BIGINT       NOT NULL COMMENT '직원 아이디',
+    year            INT          NOT NULL COMMENT '발생 연도 (잔여 유효 연차의 총합과는 구분)',
+    total_granted   DECIMAL(7, 2) NOT NULL DEFAULT 0.00 COMMENT '해당 연도 누적 부여 일수',
+    remaining_days  DECIMAL(7, 2) NOT NULL DEFAULT 0.00 COMMENT '해당 연도 발생분 중 사용/소멸 후 잔여 일수',
+    last_updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '최종 업데이트 시각',
+    CONSTRAINT uk_employee_year UNIQUE (company_id, employee_id, year),
+    CONSTRAINT fk_leave_balance_company FOREIGN KEY (company_id) REFERENCES company (id),
+    CONSTRAINT fk_leave_balance_employee FOREIGN KEY (employee_id) REFERENCES employee (id),
+    CONSTRAINT chk_leave_balance_total CHECK (total_granted >= 0),
+    CONSTRAINT chk_leave_balance_remaining CHECK (remaining_days >= 0)
+) ENGINE = InnoDB;
 
-
-
+-- 부여 유형: ANNUAL_MONTHLY(입사 1년 미만 월 개근),
+-- ANNUAL_REGULAR(1년 단위 정기), ANNUAL_LOW_ATTENDANCE(출근율 80% 미만 월 개근)
+-- 연차 발생 기간과 소멸일은 Java 서비스에서 법정 기준에 따라 계산
 CREATE TABLE grant_history
 (
     id              BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '아이디',
     employee_id     BIGINT        NOT NULL COMMENT '직원 아이디',
     company_id      BIGINT        NOT NULL COMMENT '회사 아이디',
-    grant_date      DATE          NOT NULL COMMENT '부여 발생일',
-    granted_days    DECIMAL(4, 2) NOT NULL COMMENT '부여 일수',
-    grant_type      VARCHAR(50) COMMENT '부여 유형',
-    expiration_date DATE COMMENT '소멸 예정일',
+    grant_date      DATE          NOT NULL COMMENT '연차 발생일',
+    granted_days    DECIMAL(6, 2) NOT NULL COMMENT '발생 일수',
+    remaining_days  DECIMAL(6, 2) NOT NULL COMMENT '이 부여 건의 미사용 잔여 일수',
+    grant_type      VARCHAR(50)   NOT NULL COMMENT '부여 유형',
+    expiration_date DATE          NOT NULL COMMENT '사용 가능 마지막 날',
     is_expired      BOOLEAN       NOT NULL DEFAULT FALSE COMMENT '소멸 처리 여부',
-    created_at      DATETIME      NOT NULL COMMENT '기록 시각',
-    FOREIGN KEY (employee_id) REFERENCES employee (id),
-    FOREIGN KEY (company_id) REFERENCES company (id)
-);
+    created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '기록 시각',
+    CONSTRAINT fk_grant_employee FOREIGN KEY (employee_id) REFERENCES employee (id),
+    CONSTRAINT fk_grant_company FOREIGN KEY (company_id) REFERENCES company (id),
+    CONSTRAINT uk_leave_grant_event UNIQUE (employee_id, grant_type, grant_date),
+    CONSTRAINT chk_grant_days_positive CHECK (granted_days > 0),
+    CONSTRAINT chk_grant_remaining CHECK (remaining_days >= 0 AND remaining_days <= granted_days),
+    CONSTRAINT chk_grant_expiration CHECK (expiration_date >= grant_date),
+    INDEX idx_grant_employee_expiry (employee_id, is_expired, expiration_date),
+    INDEX idx_grant_company_employee (company_id, employee_id)
+) ENGINE = InnoDB;
+
+-- 승인 휴가 사용분을 발생 건에 배분: 먼저 소멸되는 연차부터 차감
+-- 승인 취소/정정 시 released_days를 증가시키고 grant_history.remaining_days 복원
+-- 같은 문서/부여 건 조합은 한 건만 허용하여 중복 배분 방지
+CREATE TABLE leave_usage_allocation
+(
+    id                   BIGINT AUTO_INCREMENT PRIMARY KEY,
+    company_id           BIGINT        NOT NULL,
+    employee_id          BIGINT        NOT NULL,
+    attendance_record_id BIGINT        NOT NULL COMMENT '승인된 근태/휴가 기록',
+    grant_history_id     BIGINT        NOT NULL COMMENT '차감된 연차 발생 건',
+    allocated_days       DECIMAL(6, 2) NOT NULL COMMENT '누적 차감 일수',
+    released_days        DECIMAL(6, 2) NOT NULL DEFAULT 0.00 COMMENT '승인 취소/정정으로 복원한 일수',
+    created_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_leave_alloc_company FOREIGN KEY (company_id) REFERENCES company (id),
+    CONSTRAINT fk_leave_alloc_employee FOREIGN KEY (employee_id) REFERENCES employee (id),
+    CONSTRAINT fk_leave_alloc_record FOREIGN KEY (attendance_record_id) REFERENCES attendance_record (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_leave_alloc_grant FOREIGN KEY (grant_history_id) REFERENCES grant_history (id) ON DELETE RESTRICT,
+    CONSTRAINT uk_leave_alloc_record_grant UNIQUE (attendance_record_id, grant_history_id),
+    CONSTRAINT chk_leave_alloc_days CHECK (allocated_days > 0 AND released_days >= 0 AND released_days <= allocated_days),
+    INDEX idx_leave_alloc_employee (company_id, employee_id),
+    INDEX idx_leave_alloc_grant (grant_history_id)
+) ENGINE = InnoDB;
 
 
 CREATE TABLE manual_category

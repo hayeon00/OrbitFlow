@@ -24,4 +24,10 @@ public interface CalendarDayRepository extends JpaRepository<CalendarDay, LocalD
     long countByDateBetween(LocalDate start, LocalDate end);
 
     List<CalendarDay> findByDayTypeNot(CalendarDayType calendarDayType);
+
+    // 월별 개근 판정을 위한 날짜 범위 조회
+    List<CalendarDay> findByDateBetweenOrderByDateAsc(
+            LocalDate startDate,
+            LocalDate endDate
+    );
 }

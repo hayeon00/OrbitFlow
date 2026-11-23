@@ -42,6 +42,10 @@ public class SecurityConfig {
                                 .authorizeHttpRequests(auth -> auth
 
                                                 .dispatcherTypeMatchers(ASYNC).permitAll()
+
+                                                // 챗봇 API 는 /api/auth/** (permitAll) 아래에 있지만 반드시 인증이 필요하다.
+                                                // 먼저 선언해야 아래 permitAll 보다 우선 적용된다.
+                                                .requestMatchers("/api/auth/chatbot/**").authenticated()
                                                 .requestMatchers(
                                                                 "/",
                                                                 "/api/auth/**",

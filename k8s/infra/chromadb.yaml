@@ -35,8 +35,14 @@ spec:
             - containerPort: 8000
 
           env:
-            - name: CHROMA_PERSIST_DIRECTORY
+            # chromadb 0.4.x 는 IS_PERSISTENT / PERSIST_DIRECTORY 를 읽는다.
+            # (CHROMA_PERSIST_DIRECTORY 는 인식되지 않아 메모리 모드로 동작 → 재시작 시 모든 벡터 유실)
+            - name: IS_PERSISTENT
+              value: "TRUE"
+            - name: PERSIST_DIRECTORY
               value: /chroma/data
+            - name: ANONYMIZED_TELEMETRY
+              value: "FALSE"
 
           command: [ "uvicorn" ]
           args:

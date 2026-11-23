@@ -1,4 +1,4 @@
-package com.finalproj.orbitflow.attendance.leave.dto;
+package com.finalproj.orbitflow.attendance.leave.dto.request;
 
 import com.finalproj.orbitflow.approval.document.enums.DocumentStatus;
 import lombok.Getter;

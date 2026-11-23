@@ -8,6 +8,7 @@ package com.finalproj.orbitflow.approval.attendance.record.entity;
  * @since : 25. 12. 15. 월요일
  **/
 
+import com.finalproj.orbitflow.approval.attendance.record.enums.HalfDayPeriod;
 import com.finalproj.orbitflow.approval.document.entity.Document;
 import com.finalproj.orbitflow.approval.document.enums.DocumentStatus;
 import com.finalproj.orbitflow.attendance.leave.entity.LeaveType;
@@ -35,7 +36,6 @@ public class AttendanceRecord extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id")
     private Employee employee;
@@ -70,6 +70,10 @@ public class AttendanceRecord extends BaseEntity {
 
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "half_day_period", length = 20)
+    private HalfDayPeriod halfDayPeriod;
 
     public void updateDuration(LocalDate newEndDate, BigDecimal newDays) {
         this.endDate = newEndDate;

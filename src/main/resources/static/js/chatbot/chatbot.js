@@ -226,6 +226,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const msgEl = createMessageElement('bot', '', null, false, createdAt);
                 messagesContainer.appendChild(msgEl);
                 typeWriter(msgEl.querySelector('.chatbot-message-bubble'), answer);
+            } else {
+                addBotMessage('답변을 받지 못했습니다. 잠시 후 다시 시도해 주세요.');
             }
         } catch (error) {
             removeMessage(loadingId);

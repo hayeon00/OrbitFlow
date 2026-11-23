@@ -1,4 +1,4 @@
-package com.finalproj.orbitflow.attendance.leave.dto;
+package com.finalproj.orbitflow.attendance.leave.dto.response;
 
 import com.finalproj.orbitflow.attendance.leave.entity.LeaveType;
 import lombok.AllArgsConstructor;

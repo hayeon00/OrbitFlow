@@ -66,6 +66,13 @@ public class AttendanceRule {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "break_start_time")
+    private LocalTime breakStartTime;
+
+    @Column(name = "break_end_time")
+    private LocalTime breakEndTime;
+
+
     public void updateRule(
             LocalTime startTime,
             LocalTime endTime,
@@ -123,5 +130,38 @@ public class AttendanceRule {
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
+    }
+
+
+    public void updateLunchBreak(
+            LocalTime breakStartTime,
+            LocalTime breakEndTime
+    ) {
+        if (breakStartTime == null || breakEndTime == null) {
+            throw new IllegalArgumentException(
+                    "휴게 시작·종료시간은 필수입니다."
+            );
+        }
+
+        if (!breakStartTime.isBefore(breakEndTime)) {
+            throw new IllegalArgumentException(
+                    "휴게 종료시간은 시작시간보다 늦어야 합니다."
+            );
+        }
+
+        if (breakStartTime.isBefore(defaultStartTime)
+                || breakEndTime.isAfter(defaultEndTime)) {
+            throw new IllegalArgumentException(
+                    "휴게시간은 근무시간 안에 있어야 합니다."
+            );
+        }
+
+        this.breakStartTime = breakStartTime;
+        this.breakEndTime = breakEndTime;
+        this.defaultBreakMinutes = (int)
+                java.time.Duration.between(
+                        breakStartTime,
+                        breakEndTime
+                ).toMinutes();
     }
 }

@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -51,7 +52,7 @@ public class AttendanceRuleService {
     private EntityManager entityManager;
 
     // ==========================================
-    // 1. 회사 기본 근태 규칙
+    // 1. 회사 기본 근태 규칙 조회
     // ==========================================
 
     public DefaultRuleResDto getDefaultRule(Long companyId) {
@@ -60,6 +61,10 @@ public class AttendanceRuleService {
         );
     }
 
+    // ==========================================
+    // 2. 회사 기본 근태 규칙 수정
+    // ==========================================
+
     @Transactional
     public DefaultRuleResDto updateDefaultRule(
             Long companyId,
@@ -67,12 +72,51 @@ public class AttendanceRuleService {
     ) {
         AttendanceRule rule = findDefaultRuleOrThrow(companyId);
 
+        LocalTime workStart = request.defaultStartTime() != null
+                ? request.defaultStartTime()
+                : rule.getDefaultStartTime();
+
+        LocalTime workEnd = request.defaultEndTime() != null
+                ? request.defaultEndTime()
+                : rule.getDefaultEndTime();
+
+        // 수정 요청에서 점심시간을 생략하면 기존 값 유지
+        LocalTime lunchStart = request.breakStartTime() != null
+                ? request.breakStartTime()
+                : rule.getBreakStartTime();
+
+        LocalTime lunchEnd = request.breakEndTime() != null
+                ? request.breakEndTime()
+                : rule.getBreakEndTime();
+
         try {
-            rule.updateRule(
-                    request.defaultStartTime(),
-                    request.defaultEndTime(),
-                    request.defaultBreakMinutes()
+            validateLunchWithinWork(
+                    workStart,
+                    workEnd,
+                    lunchStart,
+                    lunchEnd
             );
+
+            Integer breakMinutes = resolveBreakMinutes(
+                    request.defaultBreakMinutes(),
+                    rule.getDefaultBreakMinutes(),
+                    lunchStart,
+                    lunchEnd
+            );
+
+            rule.updateRule(
+                    workStart,
+                    workEnd,
+                    breakMinutes
+            );
+
+            if (lunchStart != null && lunchEnd != null) {
+                rule.updateLunchBreak(
+                        lunchStart,
+                        lunchEnd
+                );
+            }
+
         } catch (IllegalArgumentException e) {
             throw new InvalidRequestException(e.getMessage());
         }
@@ -81,7 +125,7 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 2. 사원별 예외 근태 규칙 조회
+    // 3. 사원별 예외 근태 규칙 목록 조회
     // ==========================================
 
     public List<EmployeeRuleResDto> getExceptionRules(
@@ -102,6 +146,10 @@ public class AttendanceRuleService {
                 .toList();
     }
 
+    // ==========================================
+    // 4. 사원별 예외 근태 규칙 상세 조회
+    // ==========================================
+
     public EmployeeRuleResDto getExceptionRuleDetail(
             Long companyId,
             Long ruleId
@@ -121,7 +169,7 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 3. 사원별 예외 근태 규칙 생성
+    // 5. 사원별 예외 근태 규칙 생성
     // ==========================================
 
     @Transactional
@@ -135,14 +183,13 @@ public class AttendanceRuleService {
                 request.validTo()
         );
 
-        // 2. 사원 조회 및 비관적 락 획득
-        // 같은 사원에 대한 규칙 변경을 직렬화
+        // 2. 사원 잠금
         Employee employee = findEmployeeForRuleUpdate(
                 companyId,
                 request.employeeId()
         );
 
-        // 3. 기존 활성 예외 규칙과 기간 중복 검사
+        // 3. 기존 활성 규칙과 기간 중복 검사
         validateNoOverlappingRule(
                 companyId,
                 employee.getId(),
@@ -151,23 +198,52 @@ public class AttendanceRuleService {
                 null
         );
 
-        // 4. 엔티티 생성 (자체 유효성 검증 포함)
-        EmployeeRule rule = EmployeeRule.create(
-                companyId,
-                employee.getId(),
+        // 4. 점심 구간 및 휴게시간 검증
+        validateLunchWithinWork(
                 request.startTime(),
                 request.endTime(),
-                request.breakMinutes(),
-                request.reason(),
-                request.validFrom(),
-                request.validTo()
+                request.breakStartTime(),
+                request.breakEndTime()
         );
 
-        // 5. 저장
+        Integer breakMinutes = resolveBreakMinutes(
+                request.breakMinutes(),
+                null,
+                request.breakStartTime(),
+                request.breakEndTime()
+        );
+
+        // 5. 엔티티 생성
+        EmployeeRule rule;
+
+        try {
+            rule = EmployeeRule.create(
+                    companyId,
+                    employee.getId(),
+                    request.startTime(),
+                    request.endTime(),
+                    breakMinutes,
+                    request.reason(),
+                    request.validFrom(),
+                    request.validTo()
+            );
+
+            if (request.breakStartTime() != null) {
+                rule.updateLunchBreak(
+                        request.breakStartTime(),
+                        request.breakEndTime()
+                );
+            }
+
+        } catch (IllegalArgumentException e) {
+            throw new InvalidRequestException(e.getMessage());
+        }
+
+        // 6. 저장
         EmployeeRule savedRule =
                 employeeRuleRepository.save(rule);
 
-        // 6. 알림 생성
+        // 7. 알림 생성
         notificationService.createNotification(
                 companyId,
                 employee.getId(),
@@ -177,12 +253,12 @@ public class AttendanceRuleService {
                 "/"
         );
 
-        // 7. 응답 DTO 반환
+        // 8. 응답 반환
         return toEmployeeRuleResDto(savedRule, employee);
     }
 
     // ==========================================
-    // 4. 사원별 예외 근태 규칙 수정
+    // 6. 사원별 예외 근태 규칙 수정
     // ==========================================
 
     @Transactional
@@ -199,7 +275,7 @@ public class AttendanceRuleService {
                 rule.getCompanyId()
         );
 
-        // 2. 날짜 검증
+        // 2. 적용 기간 검증
         validateRuleDates(
                 request.validFrom(),
                 request.validTo()
@@ -211,13 +287,12 @@ public class AttendanceRuleService {
                 rule.getEmployeeId()
         );
 
-        // 4. 잠금 이후 최신 규칙 상태 조회
+        // 4. 잠금 후 최신 상태 조회
         entityManager.refresh(
                 rule,
                 LockModeType.PESSIMISTIC_WRITE
         );
 
-        // 5. 다시 소속 검증
         validateCompanyAccess(
                 companyId,
                 rule.getCompanyId()
@@ -229,14 +304,13 @@ public class AttendanceRuleService {
             );
         }
 
-        // 6. 수정 후 활성화 여부 결정
+        // 5. 수정 후 활성 여부 결정
         boolean activeAfterUpdate =
                 request.isActive() != null
                         ? request.isActive()
                         : Boolean.TRUE.equals(rule.getIsActive());
 
-        // 7. 활성 규칙인 경우 중복 검증
-        // 현재 수정 중인 규칙은 제외
+        // 6. 활성 규칙이면 기간 중복 확인
         if (activeAfterUpdate) {
             validateNoOverlappingRule(
                     companyId,
@@ -247,16 +321,52 @@ public class AttendanceRuleService {
             );
         }
 
-        // 8. 엔티티 변경
-        rule.updateRule(
+        // 7. 점심 구간 결정
+        // 요청에서 빠진 필드는 기존 값을 사용
+        LocalTime lunchStart = request.breakStartTime() != null
+                ? request.breakStartTime()
+                : rule.getBreakStartTime();
+
+        LocalTime lunchEnd = request.breakEndTime() != null
+                ? request.breakEndTime()
+                : rule.getBreakEndTime();
+
+        validateLunchWithinWork(
                 request.startTime(),
                 request.endTime(),
-                request.breakMinutes(),
-                request.reason(),
-                request.validFrom(),
-                request.validTo(),
-                request.isActive()
+                lunchStart,
+                lunchEnd
         );
+
+        Integer breakMinutes = resolveBreakMinutes(
+                request.breakMinutes(),
+                rule.getBreakMinutes(),
+                lunchStart,
+                lunchEnd
+        );
+
+        // 8. 엔티티 수정
+        try {
+            rule.updateRule(
+                    request.startTime(),
+                    request.endTime(),
+                    breakMinutes,
+                    request.reason(),
+                    request.validFrom(),
+                    request.validTo(),
+                    request.isActive()
+            );
+
+            if (lunchStart != null && lunchEnd != null) {
+                rule.updateLunchBreak(
+                        lunchStart,
+                        lunchEnd
+                );
+            }
+
+        } catch (IllegalArgumentException e) {
+            throw new InvalidRequestException(e.getMessage());
+        }
 
         // 9. 알림 생성
         notificationService.createNotification(
@@ -271,7 +381,7 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 5. 사원별 예외 근태 규칙 삭제
+    // 7. 사원별 예외 근태 규칙 삭제
     // ==========================================
 
     @Transactional
@@ -286,13 +396,11 @@ public class AttendanceRuleService {
                 rule.getCompanyId()
         );
 
-        // 사원 잠금
         Employee employee = findEmployeeForRuleUpdate(
                 companyId,
                 rule.getEmployeeId()
         );
 
-        // 최신 규칙 상태 확인
         entityManager.refresh(
                 rule,
                 LockModeType.PESSIMISTIC_WRITE
@@ -314,7 +422,7 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 6. 근태 규칙 중복 검증
+    // 8. 근태 규칙 적용 기간 중복 검사
     // ==========================================
 
     private void validateNoOverlappingRule(
@@ -345,7 +453,122 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 7. 유효성 검증
+    // 9. 점심 휴게시간 유효성 검증
+    // ==========================================
+
+    private void validateLunchWithinWork(
+            LocalTime workStart,
+            LocalTime workEnd,
+            LocalTime lunchStart,
+            LocalTime lunchEnd
+    ) {
+        // 기존 데이터와의 호환성:
+        // 점심 구간이 둘 다 없으면 허용
+        if (lunchStart == null && lunchEnd == null) {
+            return;
+        }
+
+        // 한쪽만 있으면 저장 불가
+        if (lunchStart == null || lunchEnd == null) {
+            throw new InvalidRequestException(
+                    "점심 시작·종료시간을 모두 입력해야 합니다."
+            );
+        }
+
+        if (workStart == null || workEnd == null
+                || !workEnd.isAfter(workStart)) {
+            throw new InvalidRequestException(
+                    "근무 시작·종료시간이 올바르지 않습니다."
+            );
+        }
+
+        if (!lunchEnd.isAfter(lunchStart)) {
+            throw new InvalidRequestException(
+                    "점심 종료시간은 시작시간보다 늦어야 합니다."
+            );
+        }
+
+        if (lunchStart.isBefore(workStart)
+                || lunchEnd.isAfter(workEnd)) {
+            throw new InvalidRequestException(
+                    "점심시간은 근무시간 안에 있어야 합니다."
+            );
+        }
+
+        long minutes = Duration.between(
+                lunchStart,
+                lunchEnd
+        ).toMinutes();
+
+        if (minutes <= 0 || minutes > 480) {
+            throw new InvalidRequestException(
+                    "점심 휴게시간은 1~480분이어야 합니다."
+            );
+        }
+    }
+
+    // ==========================================
+    // 10. 휴게 분 수 계산
+    // ==========================================
+
+    private Integer resolveBreakMinutes(
+            Integer requestedMinutes,
+            Integer existingMinutes,
+            LocalTime lunchStart,
+            LocalTime lunchEnd
+    ) {
+        // 점심 구간이 없는 기존 규칙
+        if (lunchStart == null && lunchEnd == null) {
+            Integer minutes = requestedMinutes != null
+                    ? requestedMinutes
+                    : existingMinutes;
+
+            validateBreakMinutes(minutes);
+            return minutes;
+        }
+
+        if (lunchStart == null || lunchEnd == null) {
+            throw new InvalidRequestException(
+                    "점심 시작·종료시간을 모두 설정해야 합니다."
+            );
+        }
+
+        long calculatedMinutes = Duration.between(
+                lunchStart,
+                lunchEnd
+        ).toMinutes();
+
+        if (calculatedMinutes <= 0 || calculatedMinutes > 480) {
+            throw new InvalidRequestException(
+                    "점심 휴게시간은 1~480분이어야 합니다."
+            );
+        }
+
+        // 클라이언트가 분 수까지 보냈다면 구간과 일치해야 함
+        if (requestedMinutes != null
+                && requestedMinutes.longValue() != calculatedMinutes) {
+            throw new InvalidRequestException(
+                    "휴게 분 수와 점심시간 구간이 일치하지 않습니다."
+            );
+        }
+
+        return Math.toIntExact(calculatedMinutes);
+    }
+
+    // ==========================================
+    // 11. 기존 휴게 분 수 검증
+    // ==========================================
+
+    private void validateBreakMinutes(Integer minutes) {
+        if (minutes != null && (minutes < 0 || minutes > 480)) {
+            throw new InvalidRequestException(
+                    "휴게 시간은 0~480분이어야 합니다."
+            );
+        }
+    }
+
+    // ==========================================
+    // 12. 근태 규칙 적용 날짜 검증
     // ==========================================
 
     private void validateRuleDates(
@@ -365,12 +588,16 @@ public class AttendanceRuleService {
         }
     }
 
+    // ==========================================
+    // 13. 회사 접근 권한 검증
+    // ==========================================
+
     private void validateCompanyAccess(
             Long currentCompanyId,
             Long targetCompanyId
     ) {
-        if (currentCompanyId == null ||
-                !currentCompanyId.equals(targetCompanyId)) {
+        if (currentCompanyId == null
+                || !currentCompanyId.equals(targetCompanyId)) {
             throw new BusinessException(
                     "해당 데이터에 접근할 권한이 없습니다."
             );
@@ -378,7 +605,7 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 8. 사원 조회
+    // 14. 사원 조회
     // ==========================================
 
     private Employee findEmployeeOrThrow(Long employeeId) {
@@ -395,6 +622,10 @@ public class AttendanceRuleService {
                         )
                 );
     }
+
+    // ==========================================
+    // 15. 사원 잠금 조회
+    // ==========================================
 
     private Employee findEmployeeForRuleUpdate(
             Long companyId,
@@ -419,7 +650,7 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 9. 근태 규칙 조회
+    // 16. 회사 기본 규칙 조회
     // ==========================================
 
     private AttendanceRule findDefaultRuleOrThrow(
@@ -434,6 +665,10 @@ public class AttendanceRuleService {
                 );
     }
 
+    // ==========================================
+    // 17. 사원별 예외 규칙 조회
+    // ==========================================
+
     private EmployeeRule findExceptionRuleOrThrow(
             Long ruleId
     ) {
@@ -446,7 +681,7 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 10. 응답 DTO 변환
+    // 18. 사원별 규칙 응답 변환
     // ==========================================
 
     private EmployeeRuleResDto toEmployeeRuleResDto(
@@ -463,6 +698,10 @@ public class AttendanceRuleService {
                         : null
         );
     }
+
+    // ==========================================
+    // 19. 사원 정보 일괄 조회
+    // ==========================================
 
     private Map<Long, Employee> getEmployeeMap(
             List<EmployeeRule> rules
@@ -482,7 +721,7 @@ public class AttendanceRuleService {
     }
 
     // ==========================================
-    // 11. 회사 기본 근태 규칙 초기화
+    // 20. 신규 회사 기본 근태 규칙 생성
     // ==========================================
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -501,6 +740,8 @@ public class AttendanceRuleService {
                 .defaultStartTime(LocalTime.of(9, 0))
                 .defaultEndTime(LocalTime.of(18, 0))
                 .defaultBreakMinutes(60)
+                .breakStartTime(LocalTime.of(12, 0))
+                .breakEndTime(LocalTime.of(13, 0))
                 .isDefault(true)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())

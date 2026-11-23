@@ -2,9 +2,11 @@ package com.finalproj.orbitflow.approval.attendance.record.repository;
 
 import com.finalproj.orbitflow.approval.attendance.record.entity.AttendanceRecord;
 import com.finalproj.orbitflow.approval.document.enums.DocumentStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -72,5 +74,37 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
             DocumentStatus documentStatus, LocalDate date, LocalDate date1);
 
     Optional<AttendanceRecord> findBySourceDocument_Id(Long documentId);
+
+
+    @Query("""
+    SELECT r
+    FROM AttendanceRecord r
+    WHERE r.company.id = :companyId
+      AND r.employee.id = :employeeId
+      AND r.status = :status
+      AND r.startDate <= :endDate
+      AND r.endDate >= :startDate
+    ORDER BY r.startDate ASC
+    """)
+    List<AttendanceRecord> findOverlappingRecords(
+            @Param("companyId") Long companyId,
+            @Param("employeeId") Long employeeId,
+            @Param("status") DocumentStatus status,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+    SELECT r
+    FROM AttendanceRecord r
+    WHERE r.sourceDocument.id = :documentId
+    """)
+    Optional<AttendanceRecord> findByDocumentIdForUpdate(
+            @Param("documentId") Long documentId
+    );
+
+
 
 }

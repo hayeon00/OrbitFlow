@@ -33,6 +33,10 @@ public class ChatbotConfig {
     @Value("${chroma.port:8000}")
     private int port;
 
+    // 삭제 등 다른 경로와 같은 컬렉션을 쓰도록 설정값을 단일 출처로 사용
+    @Value("${chroma.collection:orbitflow_manuals}")
+    private String collectionName;
+
 
     /**
      * 1️⃣ 임베딩 모델 (텍스트 → 벡터)
@@ -42,6 +46,8 @@ public class ChatbotConfig {
         return OpenAiEmbeddingModel.builder()
                 .apiKey(apiKey)
                 .modelName("text-embedding-3-small")
+                .timeout(Duration.ofSeconds(20))
+                .maxRetries(2)
                 .build();
     }
 
@@ -56,7 +62,7 @@ public class ChatbotConfig {
 
         return ChromaEmbeddingStore.builder()
                 .baseUrl(baseUrl)
-                .collectionName("orbitflow_manuals")
+                .collectionName(collectionName)
                 .timeout(Duration.ofSeconds(30))
                 .build();
     }
@@ -70,6 +76,9 @@ public class ChatbotConfig {
                 .apiKey(apiKey)
                 .modelName("gpt-4o-mini")
                 .temperature(0.0)
+                // 기본값(60s, 재시도 3회)이면 장애 시 요청 하나가 수 분간 DB 커넥션과 스레드를 점유한다
+                .timeout(Duration.ofSeconds(30))
+                .maxRetries(2)
                 .build();
     }
 }

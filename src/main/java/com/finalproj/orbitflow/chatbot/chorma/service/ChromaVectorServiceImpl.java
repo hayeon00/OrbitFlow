@@ -1,15 +1,21 @@
 package com.finalproj.orbitflow.chatbot.chorma.service;
 
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.filter.Filter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.List;
-import java.util.Map;
+import static dev.langchain4j.store.embedding.filter.MetadataFilterBuilder.metadataKey;
 
 /**
- * Please explain the class!!!
+ * 매뉴얼 벡터 삭제.
+ *
+ * <p>이전 구현은 WebClient 로 {@code /api/v1/collections/{collectionName}/delete} 를 직접 호출했지만,
+ * Chroma(0.4.x) 의 delete API 는 컬렉션 "이름"이 아니라 "UUID"를 요구하므로 항상 400(InvalidUUID)이 발생했고
+ * 호출부에서 예외를 삼켜 벡터가 실제로는 한 번도 삭제되지 않았다.
+ * 검색에 사용하는 것과 같은 {@link EmbeddingStore} 의 {@code removeAll(Filter)} 를 사용하면
+ * 컬렉션 ID 해석을 라이브러리가 처리하므로 같은 컬렉션을 확실히 대상으로 한다.</p>
  *
  * @author : rlagkdus
  * @filename : ChromaVectorServiceImpl
@@ -19,28 +25,13 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ChromaVectorServiceImpl implements ChromaVectorService {
 
-    private final WebClient chromaWebClient;
-
-    @Value("${chroma.collection}")
-    private String collectionName;
+    private final EmbeddingStore<TextSegment> embeddingStore;
 
     @Override
     public void deleteByFileId(Long companyId, String fileId) {
+        Filter filter = metadataKey("company_id").isEqualTo(companyId.toString())
+                .and(metadataKey("file_id").isEqualTo(fileId));
 
-        Map<String, Object> where = Map.of(
-                "$and", List.of(
-                        Map.of("company_id", Map.of("$eq", companyId.toString())),
-                        Map.of("file_id", Map.of("$eq", fileId))
-                )
-        );
-
-        Map<String, Object> body = Map.of("where", where);
-
-        chromaWebClient.post()
-                .uri("/api/v1/collections/{name}/delete", collectionName)
-                .bodyValue(body)
-                .retrieve()
-                .toBodilessEntity()
-                .block();
+        embeddingStore.removeAll(filter);
     }
 }
