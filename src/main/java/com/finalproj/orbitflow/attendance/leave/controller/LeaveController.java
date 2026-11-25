@@ -5,7 +5,7 @@ import com.finalproj.orbitflow.attendance.leave.dto.request.LeaveSearchReqDto;
 import com.finalproj.orbitflow.attendance.leave.dto.request.LeaveValidationReqDto;
 import com.finalproj.orbitflow.attendance.leave.dto.response.*;
 import com.finalproj.orbitflow.attendance.leave.service.AttendanceValidService;
-import com.finalproj.orbitflow.attendance.leave.service.LeaveService;
+import com.finalproj.orbitflow.attendance.leave.service.LeaveQueryService;
 import com.finalproj.orbitflow.attendance.leave.service.LeaveTypeService;
 import com.finalproj.orbitflow.global.common.ResponseDto;
 import com.finalproj.orbitflow.global.security.SecurityUser;
@@ -36,25 +36,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LeaveController {
 
-    private final LeaveService leaveService;
+    private final LeaveQueryService leaveQueryService;
     private final LeaveTypeService leaveTypeService;
     private final AttendanceValidService attendanceValidService;
-
-    @PostMapping("/admin/leave/batch-grant")
-    public ResponseEntity<ResponseDto<Void>> manualBatchGrant(@RequestParam Long companyId,
-            @RequestParam Integer year) {
-
-        leaveService.batchGrantAnnualLeave(companyId, year);
-        return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, year + "년도 연차 부여 완료", null));
-    }
-
-
 
     @GetMapping("/leave/summary")
     public ResponseEntity<ResponseDto<LeaveBalanceResDto>> getMySummary(
             @AuthenticationPrincipal SecurityUser user,
             @RequestParam(required = false) Integer year) {
-        LeaveBalanceResDto result = leaveService.getMySummary(user.getCompanyId(), user.getEmployeeId(), year);
+        LeaveBalanceResDto result = leaveQueryService.getMySummary(user.getCompanyId(), user.getEmployeeId(), year);
         return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, "연차 요약 조회 성공", result));
     }
 
@@ -64,7 +54,7 @@ public class LeaveController {
             @PageableDefault(size = 10, sort = "startDate", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable,
             @ModelAttribute LeaveSearchReqDto searchDto) {
 
-        Page<LeaveHistoryResDto> history = leaveService.getAllLeaveHistory(
+        Page<LeaveHistoryResDto> history = leaveQueryService.getAllLeaveHistory(
                 user.getCompanyId(), user.getEmployeeId(), searchDto, pageable);
 
         return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, "휴가 신청 내역 조회 완료", history));
@@ -82,7 +72,7 @@ public class LeaveController {
 
         int targetYear = (year != null) ? year : LocalDate.now().getYear();
 
-        Page<LeaveHistoryResDto> usageHistory = leaveService.getLeaveUsageHistory(
+        Page<LeaveHistoryResDto> usageHistory = leaveQueryService.getLeaveUsageHistory(
                 user.getCompanyId(), user.getEmployeeId(), targetYear, typeName, status, startDate, endDate, pageable);
 
         return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, targetYear + "년도 연차 차감 내역입니다.", usageHistory));
@@ -99,7 +89,7 @@ public class LeaveController {
 
     @GetMapping("/leave/remaining")
     public ResponseEntity<?> getLeaveRemaining() {
-        LeaveRemainingResDto result = leaveService.getLeaveRemaining(SecurityUtils.getEmployeeId());
+        LeaveRemainingResDto result = leaveQueryService.getLeaveRemaining(SecurityUtils.getEmployeeId());
 
         return ResponseEntity.ok(new ResponseDto<>(HttpStatus.OK, "잔여 연차 조회 성공", result));
     }

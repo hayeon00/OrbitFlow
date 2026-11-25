@@ -1,5 +1,5 @@
 
-package com.finalproj.orbitflow.attendance.leave.service;
+package com.finalproj.orbitflow.attendance.leave.service.accrual;
 
 import org.junit.jupiter.api.Test;
 

@@ -77,7 +77,7 @@ class LeaveWorkStatusSyncTest {
     private LeaveUsageAllocationService leaveUsageAllocationService;
 
     @InjectMocks
-    private LeaveService leaveService;
+    private LeaveWorkStatusSyncService leaveService;
 
     /**
      * Employee 엔티티의 실제 상태 변경을

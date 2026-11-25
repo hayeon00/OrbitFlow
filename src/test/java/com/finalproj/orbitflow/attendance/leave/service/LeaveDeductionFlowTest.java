@@ -110,13 +110,15 @@ class LeaveDeductionFlowTest {
         when(record.getCompany())
                 .thenReturn(company);
 
-        when(record.getDays())
+        // 일부 테스트가 불일치 상황을 만들기 위해 다시 덮어쓰므로 lenient
+        lenient().when(record.getDays())
                 .thenReturn(HALF_DAY);
 
-        when(record.getLeaveType())
+        lenient().when(record.getLeaveType())
                 .thenReturn(leaveType);
 
-        when(record.getId())
+        // 차감 성공 경로에서만 사용된다.
+        lenient().when(record.getId())
                 .thenReturn(RECORD_ID);
 
         when(employee.getId())

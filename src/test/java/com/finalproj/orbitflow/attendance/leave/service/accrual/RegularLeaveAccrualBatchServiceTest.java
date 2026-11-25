@@ -1,5 +1,5 @@
 
-package com.finalproj.orbitflow.attendance.leave.service;
+package com.finalproj.orbitflow.attendance.leave.service.accrual;
 
 import com.finalproj.orbitflow.hr.company.entity.Company;
 import com.finalproj.orbitflow.hr.company.repository.CompanyRepository;
@@ -35,7 +35,7 @@ class RegularLeaveAccrualBatchServiceTest {
     private EmployeeRepository employeeRepository;
 
     @Mock
-    private LeaveService leaveService;
+    private RegularLeaveAccrualService leaveService;
 
     @InjectMocks
     private RegularLeaveAccrualBatchService batchService;
@@ -66,7 +66,7 @@ class RegularLeaveAccrualBatchServiceTest {
     }
 
     @Test
-    void 입사기념일인_직원만_정기연차_부여를_요청한다() {
+    void 가장_최근_입사기념일을_발생일로_정기연차_부여를_요청한다() {
 
         Employee first =
                 employee(10L, LocalDate.of(2025, 11, 5));
@@ -74,11 +74,13 @@ class RegularLeaveAccrualBatchServiceTest {
         Employee second =
                 employee(20L, LocalDate.of(2023, 11, 5));
 
-        Employee notAnniversary =
+        // 오늘이 기념일이 아니어도 직전 기념일(2025-11-06)분을 재시도한다.
+        Employee afterAnniversary =
                 employee(30L, LocalDate.of(2024, 11, 6));
 
         when(first.getId()).thenReturn(10L);
         when(second.getId()).thenReturn(20L);
+        when(afterAnniversary.getId()).thenReturn(30L);
 
         when(employeeRepository.findByCompanyIdAndStatus(
                 COMPANY_ID,
@@ -86,28 +88,57 @@ class RegularLeaveAccrualBatchServiceTest {
         )).thenReturn(List.of(
                 first,
                 second,
-                notAnniversary
+                afterAnniversary
         ));
 
         batchService.run(TODAY);
 
+        verify(leaveService).grantRegularAnnualLeave(10L, TODAY);
+        verify(leaveService).grantRegularAnnualLeave(20L, TODAY);
         verify(leaveService).grantRegularAnnualLeave(
-                10L,
-                TODAY
+                30L,
+                LocalDate.of(2025, 11, 6)
         );
-
-        verify(leaveService).grantRegularAnnualLeave(
-                20L,
-                TODAY
-        );
-
-        verify(leaveService, times(2))
-                .grantRegularAnnualLeave(
-                        anyLong(),
-                        eq(TODAY)
-                );
 
         verifyNoMoreInteractions(leaveService);
+    }
+
+    @Test
+    void 기념일_당일_배치를_놓쳐도_다음날_같은_발생일로_재시도한다() {
+
+        Employee employee =
+                employee(10L, LocalDate.of(2025, 11, 5));
+
+        when(employee.getId()).thenReturn(10L);
+
+        when(employeeRepository.findByCompanyIdAndStatus(
+                COMPANY_ID,
+                EmployeeStatus.ACTIVE
+        )).thenReturn(List.of(employee));
+
+        batchService.run(TODAY.plusDays(1));
+
+        verify(leaveService).grantRegularAnnualLeave(10L, TODAY);
+        verifyNoMoreInteractions(leaveService);
+    }
+
+    @Test
+    void 입사_1주년_전이거나_입사일이_없으면_요청하지_않는다() {
+
+        Employee underOneYear =
+                employee(10L, LocalDate.of(2025, 11, 6));
+
+        Employee noHireDate =
+                employee(20L, null);
+
+        when(employeeRepository.findByCompanyIdAndStatus(
+                COMPANY_ID,
+                EmployeeStatus.ACTIVE
+        )).thenReturn(List.of(underOneYear, noHireDate));
+
+        batchService.run(TODAY);
+
+        verifyNoInteractions(leaveService);
     }
 
     @Test

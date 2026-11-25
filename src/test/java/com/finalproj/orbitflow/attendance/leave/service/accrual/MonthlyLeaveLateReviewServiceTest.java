@@ -1,5 +1,7 @@
 
-package com.finalproj.orbitflow.attendance.leave.service;
+package com.finalproj.orbitflow.attendance.leave.service.accrual;
+
+import com.finalproj.orbitflow.attendance.leave.service.MonthlyAttendanceService;
 
 import com.finalproj.orbitflow.attendance.leave.enums.MonthlyAttendanceResult;
 import com.finalproj.orbitflow.attendance.leave.repository.LeaveGrantRepository;

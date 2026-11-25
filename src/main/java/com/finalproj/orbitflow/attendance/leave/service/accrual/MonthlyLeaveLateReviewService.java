@@ -1,8 +1,9 @@
 
-package com.finalproj.orbitflow.attendance.leave.service;
+package com.finalproj.orbitflow.attendance.leave.service.accrual;
 
 import com.finalproj.orbitflow.attendance.leave.enums.MonthlyAttendanceResult;
 import com.finalproj.orbitflow.attendance.leave.repository.LeaveGrantRepository;
+import com.finalproj.orbitflow.attendance.leave.service.MonthlyAttendanceService;
 import com.finalproj.orbitflow.global.exception.NotFoundException;
 import com.finalproj.orbitflow.hr.employee.entity.Employee;
 import com.finalproj.orbitflow.hr.employee.repository.EmployeeRepository;
@@ -20,8 +21,6 @@ import java.util.Objects;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MonthlyLeaveLateReviewService {
-
-    private static final String GRANT_TYPE = "ANNUAL_MONTHLY";
 
     private final EmployeeRepository employeeRepository;
     private final LeaveGrantRepository leaveGrantRepository;
@@ -92,21 +91,25 @@ public class MonthlyLeaveLateReviewService {
         }
 
         Long companyId = employee.getCompany().getId();
-        LocalDate expirationDate = anniversary.minusDays(1);
+        LocalDate expirationDate = AccrualSchedule.firstYearEnd(hireDate);
 
         List<ReviewResult> results = new ArrayList<>();
 
-        for (int month = 1; month <= 11; month++) {
+        for (int month = 1;
+             month <= AccrualSchedule.MONTHLY_GRANT_COUNT;
+             month++) {
 
-            LocalDate grantDate = hireDate.plusMonths(month);
-            LocalDate periodStart = hireDate.plusMonths(month - 1);
+            LocalDate grantDate =
+                    AccrualSchedule.monthlyGrantDate(hireDate, month);
+            LocalDate periodStart =
+                    AccrualSchedule.monthlyPeriodStart(hireDate, month);
             LocalDate periodEnd = grantDate.minusDays(1);
 
             boolean alreadyGranted =
                     leaveGrantRepository
                             .existsByEmployeeIdAndGrantTypeAndGrantDate(
                                     employeeId,
-                                    GRANT_TYPE,
+                                    LeaveGrantTypes.MONTHLY,
                                     grantDate
                             );
 

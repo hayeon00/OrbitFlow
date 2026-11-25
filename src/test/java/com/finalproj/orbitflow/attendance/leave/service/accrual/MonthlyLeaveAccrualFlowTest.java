@@ -1,5 +1,10 @@
 
-package com.finalproj.orbitflow.attendance.leave.service;
+package com.finalproj.orbitflow.attendance.leave.service.accrual;
+
+import com.finalproj.orbitflow.attendance.leave.service.DailyAttendanceClassifier;
+import com.finalproj.orbitflow.attendance.leave.service.MonthlyAttendanceService;
+import com.finalproj.orbitflow.attendance.leave.service.LeaveTimePolicyService;
+import com.finalproj.orbitflow.attendance.leave.service.LeaveUsageAllocationService;
 
 import com.finalproj.orbitflow.approval.attendance.event.repository.AttendanceEventRepository;
 import com.finalproj.orbitflow.approval.attendance.record.entity.AttendanceRecord;
@@ -95,21 +100,37 @@ class MonthlyLeaveAccrualFlowTest {
     @Mock
     private LeaveUsageAllocationService leaveUsageAllocationService;
 
+    // 실제 일자별 판정기를 Mock 저장소와 연결한다.
     @InjectMocks
+    private DailyAttendanceClassifier classifier;
+
     private MonthlyAttendanceService monthlyAttendanceService;
 
     @InjectMocks
-    private LeaveService leaveService;
+    private MonthlyLeaveAccrualService leaveService;
 
     @BeforeEach
     void setUp() {
 
         // 두 실제 서비스를 연결한다.
         // MonthlyAttendanceService 자체는 Mock이 아니다.
+        monthlyAttendanceService =
+                new MonthlyAttendanceService(classifier);
+
         ReflectionTestUtils.setField(
                 leaveService,
                 "monthlyAttendanceService",
                 monthlyAttendanceService
+        );
+
+        // 실제 저장 로직(LeaveGrantWriter)도 Mock 저장소와 연결한다.
+        ReflectionTestUtils.setField(
+                leaveService,
+                "leaveGrantWriter",
+                new LeaveGrantWriter(
+                        leaveGrantRepository,
+                        leaveBalanceRepository
+                )
         );
 
         Employee employee = mock(Employee.class);
@@ -117,9 +138,6 @@ class MonthlyLeaveAccrualFlowTest {
 
         when(employeeRepository.findById(EMPLOYEE_ID))
                 .thenReturn(Optional.of(employee));
-
-        when(employee.getId())
-                .thenReturn(EMPLOYEE_ID);
 
         when(employee.getStatus())
                 .thenReturn(EmployeeStatus.ACTIVE);
@@ -541,7 +559,7 @@ class MonthlyLeaveAccrualFlowTest {
     void 허용된_경조휴가는_최종승인후_개근으로_인정한다() {
 
         ReflectionTestUtils.setField(
-                monthlyAttendanceService,
+                classifier,
                 "reviewCreditTypes",
                 "경조휴가,보상휴가"
         );

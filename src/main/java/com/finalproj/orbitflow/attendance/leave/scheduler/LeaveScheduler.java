@@ -1,7 +1,8 @@
 package com.finalproj.orbitflow.attendance.leave.scheduler;
 
-import com.finalproj.orbitflow.attendance.leave.service.LeaveService;
-import com.finalproj.orbitflow.attendance.leave.service.RegularLeaveAccrualBatchService;
+import com.finalproj.orbitflow.attendance.leave.service.LeaveWorkStatusSyncService;
+import com.finalproj.orbitflow.attendance.leave.service.accrual.MonthlyLeaveAccrualBatchService;
+import com.finalproj.orbitflow.attendance.leave.service.accrual.RegularLeaveAccrualBatchService;
 import com.finalproj.orbitflow.hr.company.entity.Company;
 import com.finalproj.orbitflow.hr.company.repository.CompanyRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +16,12 @@ import java.time.ZoneId;
 import java.util.List;
 
 /**
- * Please explain the class!!!
+ * 연차·근태 일일 배치 트리거.
+ *
+ * 00:05 근무상태 동기화 → 00:10 일일 근태 반영
+ * → 00:20 월별 연차 → 00:25 정기 연차 (모두 Asia/Seoul)
+ *
+ * 시간·설정 플래그·실패 로깅만 담당하고 실제 처리는 각 서비스에 위임한다.
  *
  * @author : rlagkdus
  * @filename : LeaveScheduler
@@ -28,17 +34,56 @@ import java.util.List;
 public class LeaveScheduler {
 
     private final CompanyRepository companyRepository;
-    private final LeaveService leaveService;
+    private final MonthlyLeaveAccrualBatchService monthlyLeaveAccrualBatchService;
     private final RegularLeaveAccrualBatchService regularLeaveAccrualBatchService;
+    private final LeaveWorkStatusSyncService leaveWorkStatusSyncService;
+
+
+    @Value("${orbitflow.leave.accrual-enabled:false}")
+    private boolean accrualEnabled;
 
     @Value("${orbitflow.leave.regular-accrual-enabled:false}")
     private boolean regularAccrualEnabled;
 
 
     /**
-     * 입사일 기준 정기 연차 자동 부여.
+     * 입사일 기준 1년미만 신입사원 연차 자동 부여.
      *
-     * 기존 월별 연차 배치(00:20)와 별도로
+     * 매일 한국 시간 00:20에 실행한다.
+     */
+    @Scheduled(
+            cron = "0 20 0 * * *",
+            zone = "Asia/Seoul"
+    )
+    public void runLeaveAccrualBatch() {
+
+        if (!accrualEnabled) {
+            return;
+        }
+
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
+        try {
+            monthlyLeaveAccrualBatchService.run(today);
+
+            log.info(
+                    "[연차 발생 배치 완료] date={}",
+                    today
+            );
+
+        } catch (Exception e) {
+            log.error(
+                    "[연차 발생 배치 실패] date={}",
+                    today,
+                    e
+            );
+        }
+    }
+
+
+    /**
+     * 입사일 기준 1년 이상 정기 연차 자동 부여.
+     *
      * 매일 한국 시간 00:25에 실행한다.
      */
     @Scheduled(
@@ -51,8 +96,7 @@ public class LeaveScheduler {
             return;
         }
 
-        LocalDate today =
-                LocalDate.now(ZoneId.of("Asia/Seoul"));
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         try {
             regularLeaveAccrualBatchService.run(today);
@@ -74,57 +118,38 @@ public class LeaveScheduler {
 
 
 
-    @Scheduled(cron = "0 5 0 * * *")
+    @Scheduled(cron = "0 5 0 * * *", zone = "Asia/Seoul")
     public void updateDailyWorkStatus() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
         try {
-            leaveService.updateAllEmployeesWorkStatus(LocalDate.now());
+            leaveWorkStatusSyncService.updateAllEmployeesWorkStatus(today);
         } catch (Exception e) {
+            log.error("[근무상태 동기화] 배치 오류 - today={}", today, e);
         }
     }
 
-    @Scheduled(cron = "0 10 0 * * *")
+    @Scheduled(cron = "0 10 0 * * *", zone = "Asia/Seoul")
     public void normalizeTodayAttendanceStatus() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         List<Company> companies = companyRepository.findAll();
         for (Company company : companies) {
             try {
-                leaveService.normalizeTodayAttendanceStatus(company.getId(), today);
+                leaveWorkStatusSyncService.normalizeTodayAttendanceStatus(company.getId(), today);
             } catch (Exception e) {
+                log.error(
+                        "[일일 근태 반영] 회사별 오류 - companyId={}, today={}",
+                        company.getId(),
+                        today,
+                        e
+                );
             }
         }
     }
 
 
-    @Value("${orbitflow.leave.accrual-enabled:false}")
-    private boolean accrualEnabled;
 
-    @Scheduled(cron = "0 20 0 * * *", zone = "Asia/Seoul")
-    public void runLeaveAccrualBatch() {
-
-        if (!accrualEnabled) {
-            return;
-        }
-
-        LocalDate today =
-                LocalDate.now(ZoneId.of("Asia/Seoul"));
-
-        try {
-            leaveService.batchGrantMonthlyLeave(today);
-
-            log.info(
-                    "[연차 발생 배치 완료] date={}",
-                    today
-            );
-
-        } catch (Exception e) {
-            log.error(
-                    "[연차 발생 배치 실패] date={}",
-                    today,
-                    e
-            );
-        }
-    }
 
 
 

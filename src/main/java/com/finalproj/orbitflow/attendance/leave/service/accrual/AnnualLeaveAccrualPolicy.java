@@ -1,5 +1,5 @@
 
-package com.finalproj.orbitflow.attendance.leave.service;
+package com.finalproj.orbitflow.attendance.leave.service.accrual;
 
 import org.springframework.stereotype.Component;
 
@@ -50,12 +50,10 @@ public class AnnualLeaveAccrualPolicy {
         Objects.requireNonNull(grantDate, "연차 발생일은 필수입니다.");
 
         int yearsOfService =
-                grantDate.getYear() - hireDate.getYear();
+                AccrualSchedule.yearsOfService(hireDate, grantDate);
 
         // 정확한 입사 기념일만 정기 연차 발생일로 인정
-        if (yearsOfService < 1
-                || !hireDate.plusYears(yearsOfService)
-                .equals(grantDate)) {
+        if (!AccrualSchedule.isRegularGrantDate(hireDate, grantDate)) {
             throw new IllegalArgumentException(
                     "정기 연차 발생일은 입사 1주년 이후의 "
                             + "정확한 입사 기념일이어야 합니다."

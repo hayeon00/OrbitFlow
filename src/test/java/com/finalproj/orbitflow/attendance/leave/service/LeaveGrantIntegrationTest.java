@@ -1,6 +1,12 @@
 
 package com.finalproj.orbitflow.attendance.leave.service;
 
+import com.finalproj.orbitflow.attendance.leave.service.accrual.AnnualLeaveAccrualPolicy;
+import com.finalproj.orbitflow.attendance.leave.service.accrual.LeaveGrantWriter;
+import com.finalproj.orbitflow.attendance.leave.service.accrual.MonthlyLeaveAccrualBatchService;
+import com.finalproj.orbitflow.attendance.leave.service.accrual.MonthlyLeaveAccrualService;
+import com.finalproj.orbitflow.attendance.leave.service.accrual.RegularLeaveAccrualService;
+
 import com.finalproj.orbitflow.approval.attendance.event.repository.AttendanceEventRepository;
 import com.finalproj.orbitflow.approval.attendance.record.repository.AttendanceRecordRepository;
 import com.finalproj.orbitflow.attendance.commute.repository.CommuteRepository;
@@ -69,7 +75,10 @@ import java.util.concurrent.TimeUnit;
         classes = LeaveGrantIntegrationTest.TestJpaApplication.class
 )
 @Import({
-        LeaveService.class,
+        MonthlyLeaveAccrualService.class,
+        MonthlyLeaveAccrualBatchService.class,
+        RegularLeaveAccrualService.class,
+        LeaveGrantWriter.class,
         AnnualLeaveAccrualPolicy.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -113,7 +122,13 @@ class LeaveGrantIntegrationTest {
             LocalDate.of(2026, 11, 1);
 
     @Autowired
-    private LeaveService leaveService;
+    private MonthlyLeaveAccrualService monthlyLeaveAccrualService;
+
+    @Autowired
+    private MonthlyLeaveAccrualBatchService monthlyLeaveAccrualBatchService;
+
+    @Autowired
+    private RegularLeaveAccrualService regularLeaveAccrualService;
 
     // 실제 MySQL에 연결되는 Repository
     @Autowired
@@ -187,7 +202,7 @@ class LeaveGrantIntegrationTest {
     }
 
     private void grant(LocalDate grantDate) {
-        leaveService.grantMonthlyLeave(
+        monthlyLeaveAccrualService.grantMonthlyLeave(
                 EMPLOYEE_ID,
                 grantDate
         );
@@ -276,7 +291,7 @@ class LeaveGrantIntegrationTest {
     }
 
     private void grantRegular() {
-        leaveService.grantRegularAnnualLeave(
+        regularLeaveAccrualService.grantRegularAnnualLeave(
                 EMPLOYEE_ID,
                 REGULAR_GRANT_DATE
         );
@@ -534,7 +549,7 @@ class LeaveGrantIntegrationTest {
 
                 startGate.await();
 
-                leaveService.grantMonthlyLeave(
+                monthlyLeaveAccrualService.grantMonthlyLeave(
                         EMPLOYEE_ID,
                         FIRST_GRANT_DATE
                 );
@@ -547,7 +562,7 @@ class LeaveGrantIntegrationTest {
 
                 startGate.await();
 
-                leaveService.grantMonthlyLeave(
+                monthlyLeaveAccrualService.grantMonthlyLeave(
                         EMPLOYEE_ID,
                         SECOND_GRANT_DATE
                 );
@@ -845,7 +860,7 @@ class LeaveGrantIntegrationTest {
             checkAdded = true;
 
             // ① 첫 번째 배치 실행
-            leaveService.batchGrantMonthlyLeave(today);
+            monthlyLeaveAccrualBatchService.run(today);
 
             Long firstGrantCount = jdbc.queryForObject(
                     """
@@ -923,7 +938,7 @@ class LeaveGrantIntegrationTest {
 
         try {
             // ② 장애 원인을 제거한 뒤 재실행
-            leaveService.batchGrantMonthlyLeave(today);
+            monthlyLeaveAccrualBatchService.run(today);
 
             Long firstGrantCount = jdbc.queryForObject(
                     """
@@ -990,7 +1005,7 @@ class LeaveGrantIntegrationTest {
             );
 
             // ③ 다시 실행해도 중복 부여되지 않는다.
-            leaveService.batchGrantMonthlyLeave(today);
+            monthlyLeaveAccrualBatchService.run(today);
 
             assertEquals(
                     2L,

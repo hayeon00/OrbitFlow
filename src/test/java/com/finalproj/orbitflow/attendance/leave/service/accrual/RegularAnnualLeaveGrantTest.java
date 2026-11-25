@@ -1,5 +1,9 @@
 
-package com.finalproj.orbitflow.attendance.leave.service;
+package com.finalproj.orbitflow.attendance.leave.service.accrual;
+
+import com.finalproj.orbitflow.attendance.leave.service.AnnualAttendanceService;
+import com.finalproj.orbitflow.attendance.leave.service.MonthlyAttendanceService;
+import com.finalproj.orbitflow.attendance.leave.service.LeaveUsageAllocationService;
 
 import com.finalproj.orbitflow.approval.attendance.event.repository.AttendanceEventRepository;
 import com.finalproj.orbitflow.approval.attendance.record.repository.AttendanceRecordRepository;
@@ -13,7 +17,9 @@ import com.finalproj.orbitflow.hr.employee.entity.Employee;
 import com.finalproj.orbitflow.hr.employee.enums.EmployeeStatus;
 import com.finalproj.orbitflow.hr.employee.repository.EmployeeRepository;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.mockito.InjectMocks;
@@ -74,7 +80,21 @@ class RegularAnnualLeaveGrantTest {
             new AnnualLeaveAccrualPolicy();
 
     @InjectMocks
-    private LeaveService leaveService;
+    private RegularLeaveAccrualService leaveService;
+
+    @BeforeEach
+    void connectGrantWriter() {
+
+        // 실제 저장 로직(LeaveGrantWriter)을 Mock 저장소와 연결한다.
+        ReflectionTestUtils.setField(
+                leaveService,
+                "leaveGrantWriter",
+                new LeaveGrantWriter(
+                        leaveGrantRepository,
+                        leaveBalanceRepository
+                )
+        );
+    }
 
     /**
      * 재직 중인 사원과 회사 정보를 설정한다.
@@ -103,16 +123,6 @@ class RegularAnnualLeaveGrantTest {
                 .thenReturn(COMPANY_ID);
 
         return employee;
-    }
-
-    /**
-     * 실제 연차 발생 이력을 저장하는 경우에만
-     * 사원 ID 조회를 설정한다.
-     */
-    private void givenGrantTarget(Employee employee) {
-
-        when(employee.getId())
-                .thenReturn(EMPLOYEE_ID);
     }
 
     /**
@@ -191,7 +201,6 @@ class RegularAnnualLeaveGrantTest {
         LocalDate hire = LocalDate.of(2024, 3, 10);
 
         Employee employee = givenActiveEmployee(hire);
-        givenGrantTarget(employee);
 
         givenAnnualAttendance(
                 hire,
@@ -214,7 +223,6 @@ class RegularAnnualLeaveGrantTest {
         LocalDate hire = LocalDate.of(2022, 3, 10);
 
         Employee employee = givenActiveEmployee(hire);
-        givenGrantTarget(employee);
 
         givenAnnualAttendance(
                 LocalDate.of(2024, 3, 10),

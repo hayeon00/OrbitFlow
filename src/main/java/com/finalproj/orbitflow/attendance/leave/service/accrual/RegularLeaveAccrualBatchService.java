@@ -1,5 +1,5 @@
 
-package com.finalproj.orbitflow.attendance.leave.service;
+package com.finalproj.orbitflow.attendance.leave.service.accrual;
 
 import com.finalproj.orbitflow.hr.company.entity.Company;
 import com.finalproj.orbitflow.hr.company.repository.CompanyRepository;
@@ -16,6 +16,19 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * 입사 1주년 이후 정기 연차 일괄 부여 (대상 선정 + 실패 격리).
+ *
+ * - ACTIVE 직원만 대상
+ * - 가장 최근 입사 기념일(1주년 이후)을 발생일로 지급을 시도한다.
+ *   기념일 당일 배치 누락(서버 중단·오류)이나 근태 미확정 보류가 있어도
+ *   다음 기념일 전까지 매일 다시 평가되어 지급 기회를 잃지 않는다.
+ * - 이미 지급된 경우 RegularLeaveAccrualService의 중복 검사에서 즉시 종료된다.
+ * - 직원별 지급은 RegularLeaveAccrualService의 트랜잭션에서 처리
+ * - 회사·직원 단위로 실패를 격리하여 다음 대상을 계속 처리
+ *
+ * 이 클래스에는 @Transactional을 적용하지 않는다.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -23,24 +36,11 @@ public class RegularLeaveAccrualBatchService {
 
     private final CompanyRepository companyRepository;
     private final EmployeeRepository employeeRepository;
-    private final LeaveService leaveService;
+    private final RegularLeaveAccrualService regularLeaveAccrualService;
 
-    /**
-     * 입사일 기준 정기 연차 자동 부여.
-     *
-     * - ACTIVE 직원만 대상
-     * - 입사 1주년 이후의 입사 기념일에만 실행
-     * - 개별 지급은 LeaveService의 트랜잭션에서 처리
-     * - 직원별 실패를 격리하여 다음 직원 계속 처리
-     *
-     * 이 메서드 자체에는 @Transactional을 적용하지 않는다.
-     */
     public void run(LocalDate today) {
 
-        Objects.requireNonNull(
-                today,
-                "연차 배치 기준일은 필수입니다."
-        );
+        Objects.requireNonNull(today, "연차 배치 기준일은 필수입니다.");
 
         for (Company company : companyRepository.findAll()) {
 
@@ -66,32 +66,20 @@ public class RegularLeaveAccrualBatchService {
 
             for (Employee employee : employees) {
 
+                LocalDate grantDate =
+                        AccrualSchedule.latestRegularGrantDate(
+                                employee.getHireDate(),
+                                today
+                        );
+
+                if (grantDate == null) {
+                    continue;
+                }
+
                 try {
-                    LocalDate hireDate = employee.getHireDate();
-
-                    if (hireDate == null) {
-                        continue;
-                    }
-
-                    int yearsOfService =
-                            today.getYear() - hireDate.getYear();
-
-                    if (yearsOfService < 1) {
-                        continue;
-                    }
-
-                    // 정확한 입사 기념일에만 지급한다.
-                    // 예: 2025-11-05 입사 → 2026-11-05 지급
-                    if (!hireDate.plusYears(yearsOfService)
-                            .equals(today)) {
-                        continue;
-                    }
-
-                    // 실제 출근율 평가, 연차 일수 계산,
-                    // 중복 방지, DB 저장은 기존 서비스에서 처리한다.
-                    leaveService.grantRegularAnnualLeave(
+                    regularLeaveAccrualService.grantRegularAnnualLeave(
                             employee.getId(),
-                            today
+                            grantDate
                     );
 
                 } catch (RuntimeException e) {
@@ -110,9 +98,6 @@ public class RegularLeaveAccrualBatchService {
             }
         }
 
-        log.info(
-                "[정기 연차 배치] 실행 완료 - today={}",
-                today
-        );
+        log.info("[정기 연차 배치] 실행 완료 - today={}", today);
     }
 }

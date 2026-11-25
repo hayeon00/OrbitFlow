@@ -1,6 +1,8 @@
 
 package com.finalproj.orbitflow.attendance.leave.service;
 
+import com.finalproj.orbitflow.attendance.leave.service.accrual.AnnualLeaveAccrualPolicy;
+
 import com.finalproj.orbitflow.approval.attendance.event.entity.AttendanceEvent;
 import com.finalproj.orbitflow.approval.attendance.event.repository.AttendanceEventRepository;
 import com.finalproj.orbitflow.approval.attendance.record.entity.AttendanceRecord;
@@ -12,7 +14,9 @@ import com.finalproj.orbitflow.attendance.commute.enums.AttendanceStatus;
 import com.finalproj.orbitflow.attendance.commute.repository.CommuteRepository;
 import com.finalproj.orbitflow.attendance.leave.entity.LeaveType;
 import com.finalproj.orbitflow.attendance.leave.enums.LeaveAttendancePolicy;
-import com.finalproj.orbitflow.attendance.leave.enums.MonthlyAttendanceResult;
+import com.finalproj.orbitflow.attendance.leave.entity.LeaveTimePolicy;
+import com.finalproj.orbitflow.attendance.rule.dto.response.EffectiveAttendanceRule;
+import com.finalproj.orbitflow.attendance.rule.service.EffectiveAttendanceRuleService;
 import com.finalproj.orbitflow.global.time.calendar.entity.CalendarDay;
 import com.finalproj.orbitflow.global.time.calendar.enums.CalendarDayType;
 import com.finalproj.orbitflow.global.time.calendar.repository.CalendarDayRepository;
@@ -61,13 +65,21 @@ class AnnualAttendanceServiceTest {
     private AttendanceEventRepository attendanceEventRepository;
 
     @Mock
-    private MonthlyAttendanceService monthlyAttendanceService;
+    private EffectiveAttendanceRuleService effectiveAttendanceRuleService;
 
+    @Mock
+    private LeaveTimePolicyService leaveTimePolicyService;
+
+    // 실제 일자별 판정기를 Mock 저장소와 연결한다.
     @InjectMocks
+    private DailyAttendanceClassifier classifier;
+
     private AnnualAttendanceService service;
 
     @BeforeEach
     void setUp() {
+        service = new AnnualAttendanceService(classifier);
+
         List<CalendarDay> days = new ArrayList<>();
 
         for (LocalDate date = START;
@@ -299,11 +311,17 @@ class AnnualAttendanceServiceTest {
     }
 
     @Test
-    void 승인된_반차는_기존_시간판정_결과를_사용() {
+    void 승인된_오전반차는_반차_시간판정을_충족하면_출근으로_인정() {
+        // 09:00 출근 ~ 18:00 퇴근
         givenAttendance(AttendanceStatus.LATE, false);
 
         AttendanceRecord approvedRecord =
                 approvedLeave(LeaveAttendancePolicy.PARTIAL_DAY);
+
+        LeaveType type = approvedRecord.getLeaveType();
+
+        when(type.getTypeName()).thenReturn("오전반차");
+        when(type.getUnitDays()).thenReturn(new BigDecimal("0.5"));
 
         when(attendanceRecordRepository.findOverlappingRecords(
                 COMPANY_ID,
@@ -313,17 +331,53 @@ class AnnualAttendanceServiceTest {
                 END
         )).thenReturn(List.of(approvedRecord));
 
-        when(monthlyAttendanceService.evaluate(
-                COMPANY_ID, EMPLOYEE_ID, TARGET, TARGET
-        )).thenReturn(MonthlyAttendanceResult.PERFECT);
+        when(effectiveAttendanceRuleService.resolve(
+                COMPANY_ID, EMPLOYEE_ID, TARGET
+        )).thenReturn(new EffectiveAttendanceRule(
+                COMPANY_ID, EMPLOYEE_ID, TARGET,
+                java.time.LocalTime.of(9, 0), java.time.LocalTime.of(18, 0),
+                java.time.LocalTime.of(12, 0), java.time.LocalTime.of(13, 0),
+                60, false, 100L
+        ));
+
+        LeaveTimePolicy policy = mock(LeaveTimePolicy.class);
+        when(policy.getMorningHalfReturnTime())
+                .thenReturn(java.time.LocalTime.of(14, 0));
+        when(leaveTimePolicyService.getPolicy(COMPANY_ID))
+                .thenReturn(policy);
 
         var result = evaluate();
 
+        assertEquals(5, result.scheduledDays());
         assertEquals(5, result.attendedDays());
+        assertEquals(0, result.undeterminedDays());
+    }
 
-        verify(monthlyAttendanceService).evaluate(
-                COMPANY_ID, EMPLOYEE_ID, TARGET, TARGET
-        );
+    @Test
+    void 승인된_출장일에_일반출근기록이_있으면_미확정() {
+        // 출장·외근일에는 출근 체크가 막혀 있으므로 데이터 불일치로 본다.
+        givenAttendance(AttendanceStatus.ON_TIME, false);
+
+        AttendanceEvent event = mock(AttendanceEvent.class);
+        when(event.getStartDate()).thenReturn(TARGET);
+        when(event.getEndDate()).thenReturn(TARGET);
+
+        when(attendanceEventRepository
+                .findApprovedOverlappingWorkEvents(
+                        COMPANY_ID,
+                        EMPLOYEE_ID,
+                        List.of(BaseRole.BUSINESS_TRIP, BaseRole.OUTWORK),
+                        DocumentStatus.APPROVED,
+                        START,
+                        END
+                ))
+                .thenReturn(List.of(event));
+
+        var result = evaluate();
+
+        assertEquals(5, result.scheduledDays());
+        assertEquals(4, result.attendedDays());
+        assertEquals(1, result.undeterminedDays());
     }
 
     @Test
@@ -562,7 +616,7 @@ class AnnualAttendanceServiceTest {
     void 허용된_경조휴가는_연간출근율에_반영한다() {
 
         ReflectionTestUtils.setField(
-                service,
+                classifier,
                 "reviewCreditTypes",
                 "경조휴가,보상휴가"
         );

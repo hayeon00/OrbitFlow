@@ -70,8 +70,16 @@ class MonthlyAttendanceServiceTest {
     @Mock
     private LeaveTimePolicyService leaveTimePolicyService;
 
+    // 실제 일자별 판정기를 Mock 저장소와 연결한다.
     @InjectMocks
+    private DailyAttendanceClassifier classifier;
+
     private MonthlyAttendanceService service;
+
+    @org.junit.jupiter.api.BeforeEach
+    void createService() {
+        service = new MonthlyAttendanceService(classifier);
+    }
 
 
 
@@ -278,6 +286,33 @@ class MonthlyAttendanceServiceTest {
 
 
     @Test
+    void 주말_달력데이터가_없어도_평일_개근이면_PERFECT() {
+
+        // 2026-10-05(월) ~ 2026-10-11(일), 달력은 평일분만 존재
+        LocalDate end = LocalDate.of(2026, 10, 11);
+
+        when(calendarDayRepository
+                .findByDateBetweenOrderByDateAsc(START, end))
+                .thenReturn(workdays());
+
+        when(commuteRepository
+                .findByCompanyIdAndEmployeeIdAndWorkDateBetween(
+                        COMPANY_ID, EMPLOYEE_ID, START, end))
+                .thenReturn(List.of(
+                        attendance(5, AttendanceStatus.ON_TIME, true),
+                        attendance(6, AttendanceStatus.ON_TIME, true),
+                        attendance(7, AttendanceStatus.ON_TIME, true),
+                        attendance(8, AttendanceStatus.ON_TIME, true),
+                        attendance(9, AttendanceStatus.ON_TIME, true)
+                ));
+
+        assertEquals(
+                MonthlyAttendanceResult.PERFECT,
+                service.evaluate(COMPANY_ID, EMPLOYEE_ID, START, end)
+        );
+    }
+
+    @Test
     void 잘못된_평가기간은_예외() {
 
         assertThrows(
@@ -390,6 +425,63 @@ class MonthlyAttendanceServiceTest {
     }
 
     @Test
+    void 승인된_출장일에_일반출근기록이_있으면_판정보류() {
+
+        // 출장·외근일에는 출근 체크가 막혀 있으므로
+        // 일반 출근 기록이 함께 있으면 데이터 불일치로 보고 보류한다.
+        AttendanceEvent event = mock(AttendanceEvent.class);
+
+        when(event.getStartDate())
+                .thenReturn(LocalDate.of(2026, 10, 7));
+
+        when(event.getEndDate())
+                .thenReturn(LocalDate.of(2026, 10, 7));
+
+        prepareCalendarAndApprovedRecords(List.of(event));
+
+        mockAttendance(List.of(
+                attendance(5, AttendanceStatus.ON_TIME, true),
+                attendance(6, AttendanceStatus.ON_TIME, true),
+                attendance(7, AttendanceStatus.ON_TIME, true),
+                attendance(8, AttendanceStatus.ON_TIME, true),
+                attendance(9, AttendanceStatus.ON_TIME, true)
+        ));
+
+        assertEquals(
+                MonthlyAttendanceResult.UNDETERMINED,
+                evaluate()
+        );
+    }
+
+    @Test
+    void 같은날_출장외근이_2건_겹치면_판정보류() {
+
+        AttendanceEvent trip = mock(AttendanceEvent.class);
+        AttendanceEvent outwork = mock(AttendanceEvent.class);
+
+        for (AttendanceEvent event : List.of(trip, outwork)) {
+            when(event.getStartDate())
+                    .thenReturn(LocalDate.of(2026, 10, 7));
+            when(event.getEndDate())
+                    .thenReturn(LocalDate.of(2026, 10, 7));
+        }
+
+        prepareCalendarAndApprovedRecords(List.of(trip, outwork));
+
+        mockAttendance(List.of(
+                attendance(5, AttendanceStatus.ON_TIME, true),
+                attendance(6, AttendanceStatus.ON_TIME, true),
+                attendance(8, AttendanceStatus.ON_TIME, true),
+                attendance(9, AttendanceStatus.ON_TIME, true)
+        ));
+
+        assertEquals(
+                MonthlyAttendanceResult.UNDETERMINED,
+                evaluate()
+        );
+    }
+
+    @Test
     void 승인된_외근과_결근기록이_충돌하면_판정보류() {
 
         AttendanceEvent event = mock(AttendanceEvent.class);
@@ -464,8 +556,11 @@ class MonthlyAttendanceServiceTest {
     }
 
     @Test
-    void 승인된_전일연차와_결근기록이_충돌하면_보류() {
+    void 승인된_전일연차일의_결근기록은_출근으로_인정한다() {
 
+        // 결근 처리 배치가 남긴 ABSENT 기록은 수정하지 않고,
+        // 개근 평가에서만 승인된 종일 연차를 우선 적용한다.
+        // (AnnualAttendanceService와 동일한 규칙)
         prepareCalendarAndApprovedRecords(
                 List.of(),
                 List.of(fullDayLeave(DocumentStatus.APPROVED))
@@ -475,6 +570,28 @@ class MonthlyAttendanceServiceTest {
                 attendance(5, AttendanceStatus.ON_TIME, true),
                 attendance(6, AttendanceStatus.ON_TIME, true),
                 attendance(7, AttendanceStatus.ABSENT, false),
+                attendance(8, AttendanceStatus.ON_TIME, true),
+                attendance(9, AttendanceStatus.ON_TIME, true)
+        ));
+
+        assertEquals(
+                MonthlyAttendanceResult.PERFECT,
+                evaluate()
+        );
+    }
+
+    @Test
+    void 승인된_전일연차일에_실제_출근기록이_있으면_보류() {
+
+        prepareCalendarAndApprovedRecords(
+                List.of(),
+                List.of(fullDayLeave(DocumentStatus.APPROVED))
+        );
+
+        mockAttendance(List.of(
+                attendance(5, AttendanceStatus.ON_TIME, true),
+                attendance(6, AttendanceStatus.ON_TIME, true),
+                attendance(7, AttendanceStatus.ON_TIME, true),
                 attendance(8, AttendanceStatus.ON_TIME, true),
                 attendance(9, AttendanceStatus.ON_TIME, true)
         ));
